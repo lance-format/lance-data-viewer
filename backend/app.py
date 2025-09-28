@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from serialize_value import serialize_value
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,17 +55,8 @@ def get_lance_connection():
 
 def serialize_arrow_value(value):
     try:
-        if pa.types.is_null(value.type):
-            return None
-        elif pa.types.is_boolean(value.type):
-            return value.as_py()
-        elif pa.types.is_integer(value.type) or pa.types.is_floating(value.type):
-            return value.as_py()
-        elif pa.types.is_string(value.type) or pa.types.is_large_string(value.type):
-            return value.as_py()
-        elif pa.types.is_timestamp(value.type):
-            return value.as_py().isoformat() if value.as_py() else None
-        elif pa.types.is_list(value.type) and pa.types.is_floating(value.value_type):
+        # Handle vector columns with special processing
+        if pa.types.is_list(value.type) and pa.types.is_floating(value.value_type):
             try:
                 vec = value.as_py()
                 if vec is None:
@@ -118,8 +110,9 @@ def serialize_arrow_value(value):
             except Exception as vec_error:
                 logger.warning(f"Error processing vector data: {vec_error}")
                 return {"type": "vector", "error": f"Vector processing failed: {str(vec_error)}"}
-        else:
-            return str(value.as_py())
+
+        # Use the general serialize_value utility for all other types
+        return serialize_value(value)
     except Exception as e:
         logger.warning(f"Error serializing value: {e}")
         return {"error": f"Serialization failed: {str(e)}"}

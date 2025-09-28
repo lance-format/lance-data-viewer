@@ -21,7 +21,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 
 WORKDIR /app
 
-COPY backend/app.py .
+COPY backend/*.py .
 COPY web/vanilla/ /web/
 
 RUN chown -R appuser:appuser /app /web
