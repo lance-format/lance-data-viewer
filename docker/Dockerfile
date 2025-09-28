@@ -22,7 +22,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 WORKDIR /app
 
 COPY backend/app.py .
-COPY web/ /web/
+COPY web/vanilla/ /web/
 
 RUN chown -R appuser:appuser /app /web
 RUN chmod -R 755 /web
