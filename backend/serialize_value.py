@@ -7,6 +7,8 @@ import pyarrow as pa
 
 def _serialize_temporal(obj):
     """Convert temporal types to string representation."""
+    if obj is None:
+        return None
     if isinstance(obj, (datetime, date, time)):
         return obj.isoformat()
     if isinstance(obj, timedelta):
@@ -16,23 +18,37 @@ def _serialize_temporal(obj):
 
 def _serialize_pyarrow_scalar(obj):
     """Convert PyArrow scalar types to JSON-serializable format."""
-    if pa.types.is_binary(obj.type):
-        return base64.b64encode(obj.as_py()).decode("utf-8")
+    # PREVENTS "Cannot export buffer from null Arrow Scalar"
+    if not getattr(obj, "is_valid", True):
+        return None
+
+    # Use pa.types.is_binary to strictly target raw bytes, avoiding StringScalars
+    if pa.types.is_binary(obj.type) or pa.types.is_large_binary(obj.type):
+        val = obj.as_py()
+        return base64.b64encode(val).decode("utf-8") if val else None
 
     if pa.types.is_temporal(obj.type):
         return _serialize_temporal(obj.as_py())
 
-    if pa.types.is_list(obj.type) or pa.types.is_map(obj.type):
-        return [serialize_value(item) for item in obj.as_py()]
+    if pa.types.is_list(obj.type) or pa.types.is_map(obj.type) or pa.types.is_fixed_size_list(obj.type):
+        val = obj.as_py()
+        if val is None:
+            return None
+        return [serialize_value(item) for item in val]
 
     if pa.types.is_struct(obj.type):
+        # PREVENTS "'StructScalar' object has no attribute 'field'"
+        val = obj.as_py()
+        if val is None:
+            return None
         return {
-            field.name: serialize_value(obj.field(field.name).as_py())
-            for field in obj.type
+            k: serialize_value(v)
+            for k, v in val.items()
         }
 
     if pa.types.is_floating(obj.type):
-        return float(obj.as_py())
+        val = obj.as_py()
+        return float(val) if val is not None else None
 
     return obj.as_py()
 
@@ -48,7 +64,7 @@ def _serialize_container(obj):
 
 def _serialize_basic_types(obj):
     """Convert basic Python types to JSON-serializable format."""
-    if isinstance(obj, (bytes, pa.BinaryScalar)):
+    if isinstance(obj, bytes):
         return base64.b64encode(obj).decode("utf-8")
     if isinstance(obj, (datetime, date, time)):
         return obj.isoformat()
@@ -62,13 +78,10 @@ def _serialize_basic_types(obj):
 def serialize_value(obj):
     """
     Recursively convert objects to JSON-serializable format.
-
-    Handles:
-    - bytes/PyArrow binary: Base64-encoded string
-    - datetime types: ISO format string
-    - PyArrow types: Python native types
-    - nested types: recursive conversion
     """
+    if obj is None:
+        return None
+
     # First try basic type conversions
     result = _serialize_basic_types(obj)
     if result is not obj:

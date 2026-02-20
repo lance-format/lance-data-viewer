@@ -249,12 +249,19 @@ class LanceViewer {
         this.elements.tableBody.innerHTML = '';
         rows.forEach(row => {
             const tr = document.createElement('tr');
-            columns.forEach(column => {
+      columns.forEach(column => {
                 const td = document.createElement('td');
                 const value = row[column];
 
-                if (value && typeof value === 'object' && value.type === 'vector') {
-                    this.renderVectorCell(td, value, column);
+                if (value && typeof value === 'object') {
+                    if (value.type === 'vector') {
+                        this.renderVectorCell(td, value, column);
+                    } else {
+                        // Clean UI fix for nested structs, dicts, and arrays
+                        const pre = document.createElement('pre');
+                        pre.textContent = JSON.stringify(value, null, 2);
+                        td.appendChild(pre);
+                    }
                 } else {
                     td.textContent = value === null ? 'null' : String(value);
                 }
