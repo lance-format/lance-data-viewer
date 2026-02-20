@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lance Data Viewer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -45,30 +47,35 @@
                 <div class="dataset-header" id="datasetHeader" style="display: none;">
                     <div class="header-row">
                         <h2 id="datasetTitle">Select a dataset</h2>
-                        <div class="pagination-controls">
-                            <button id="prevPage" disabled>Previous</button>
-                            <span id="pageInfo">Page 1</span>
-                            <button id="nextPage" disabled>Next</button>
-                            <select id="pageSize">
-                                <option value="25">25 rows</option>
-                                <option value="50" selected>50 rows</option>
-                                <option value="100">100 rows</option>
-                                <option value="200">200 rows</option>
-                            </select>
+                        <div style="display: flex; align-items: center; gap: 20px;">
+                            <label
+                                style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; color: #495057;">
+                                <input type="checkbox" id="toggleWordWrap"> Wrap Text
+                            </label>
+                            <div class="pagination-controls">
+                                <button id="prevPage" disabled>Previous</button>
+                                <span id="pageInfo">Page 1</span>
+                                <button id="nextPage" disabled>Next</button>
+                                <select id="pageSize">
+                                    <option value="25">25 rows</option>
+                                    <option value="50" selected>50 rows</option>
+                                    <option value="100">100 rows</option>
+                                    <option value="200">200 rows</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="data-section" id="dataSection" style="display: none;">
-                    <div class="table-container">
-                        <table id="dataTable">
-                            <thead id="tableHead"></thead>
-                            <tbody id="tableBody"></tbody>
-                        </table>
+                    <div class="data-section" id="dataSection" style="display: none;">
+                        <div class="table-container">
+                            <table id="dataTable">
+                                <thead id="tableHead"></thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="loading" id="dataLoading" style="display: none;">Loading data...</div>
+                        <div class="error" id="dataError" style="display: none;"></div>
                     </div>
-                    <div class="loading" id="dataLoading" style="display: none;">Loading data...</div>
-                    <div class="error" id="dataError" style="display: none;"></div>
-                </div>
             </section>
         </main>
     </div>
@@ -79,4 +86,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

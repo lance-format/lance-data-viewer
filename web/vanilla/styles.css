@@ -397,7 +397,8 @@ table tr:hover {
     }
 }
 
-/* --- Complex Object Viewer Styles --- */
+
+/* --- Complex Object Viewer --- */
 .complex-object-wrapper {
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
     font-size: 0.85rem;
@@ -467,4 +468,18 @@ table tr:hover {
 
 .co-toggle-btn:hover {
     color: #2980b9;
+}
+
+
+/* --- Dynamic Word Wrap --- */
+table.wrap-text td {
+    max-width: 600px;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+table.wrap-text .complex-object-wrapper {
+    white-space: pre-wrap; 
+    word-wrap: break-word;
 }

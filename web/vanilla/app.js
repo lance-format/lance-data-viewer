@@ -37,7 +37,8 @@ class LanceViewer {
             selectAllCols: document.getElementById('selectAllCols'),
             selectNoneCols: document.getElementById('selectNoneCols'),
             applyColumns: document.getElementById('applyColumns'),
-            tooltip: document.getElementById('tooltip')
+            tooltip: document.getElementById('tooltip'),
+            toggleWordWrap: document.getElementById('toggleWordWrap')
         };
     }
 
@@ -55,6 +56,14 @@ class LanceViewer {
         this.elements.applyColumns.addEventListener('click', () => this.applyColumnSelection());
 
         document.addEventListener('mousemove', (e) => this.updateTooltipPosition(e));
+
+        this.elements.toggleWordWrap.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                this.elements.dataTable.classList.add('wrap-text');
+            } else {
+                this.elements.dataTable.classList.remove('wrap-text');
+            }
+        });
     }
 
     async checkHealth() {
