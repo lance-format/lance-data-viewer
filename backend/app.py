@@ -57,7 +57,7 @@ def get_lance_connection():
 def serialize_arrow_value(value):
     try:
         # Handle vector columns with special processing
-        if pa.types.is_list(value.type) and pa.types.is_floating(value.value_type):
+        if (pa.types.is_list(value.type) or pa.types.is_fixed_size_list(value.type)) and pa.types.is_floating(value.type.value_type):
             try:
                 vec = value.as_py()
                 if vec is None:
@@ -179,7 +179,7 @@ async def get_dataset_schema(dataset_name: str):
                 "nullable": field.nullable
             }
 
-            if pa.types.is_list(field.type) and pa.types.is_floating(field.type.value_type):
+            if (pa.types.is_list(field.type) or pa.types.is_fixed_size_list(field.type)) and pa.types.is_floating(field.type.value_type):
                 field_info["vector_dim"] = None
 
             schema_dict["fields"].append(field_info)
@@ -208,7 +208,7 @@ async def get_dataset_columns(dataset_name: str):
                 "nullable": field.nullable
             }
 
-            if pa.types.is_list(field.type) and pa.types.is_floating(field.type.value_type):
+            if (pa.types.is_list(field.type) or pa.types.is_fixed_size_list(field.type)) and pa.types.is_floating(field.type.value_type):
                 col_info["is_vector"] = True
                 col_info["dim"] = None
             else:
@@ -265,7 +265,7 @@ async def get_dataset_rows(
                     }
 
                     # Add special info for vector columns
-                    if pa.types.is_list(field.type) and pa.types.is_floating(field.type.value_type):
+                    if (pa.types.is_list(field.type) or pa.types.is_fixed_size_list(field.type)) and pa.types.is_floating(field.type.value_type):
                         field_info["vector_info"] = {
                             "is_vector": True,
                             "element_type": str(field.type.value_type),
@@ -382,7 +382,7 @@ async def get_vector_preview(
             raise HTTPException(status_code=400, detail=f"Column '{column}' not found")
 
         field = next(field for field in table.schema if field.name == column)
-        if not (pa.types.is_list(field.type) and pa.types.is_floating(field.type.value_type)):
+        if not ((pa.types.is_list(field.type) or pa.types.is_fixed_size_list(field.type)) and pa.types.is_floating(field.type.value_type)):
             raise HTTPException(status_code=400, detail=f"Column '{column}' is not a vector column")
 
         result = table.to_arrow().select([column]).slice(0, limit)
