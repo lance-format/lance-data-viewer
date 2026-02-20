@@ -56,35 +56,35 @@ def get_lance_connection():
 
 def serialize_arrow_value(value):
     try:
-        # Handle vector columns with special processing
-        if (pa.types.is_list(value.type) or pa.types.is_fixed_size_list(value.type)) and pa.types.is_floating(value.type.value_type):
+        # Stop immediately if the Arrow scalar is null
+        if value is None or not getattr(value, "is_valid", True):
+            return None
+
+        # 1. Handle Vector columns (Top-level OR nested)
+        if (pa.types.is_list(value.type) or pa.types.is_fixed_size_list(value.type)) and getattr(value.type, "value_type", None) and pa.types.is_floating(value.type.value_type):
             try:
                 vec = value.as_py()
                 if vec is None:
                     return None
 
-                # Validate vector data
                 if not isinstance(vec, (list, tuple)) or len(vec) == 0:
                     return {"type": "vector", "error": "Invalid vector data"}
 
-                # Check for valid numeric values
                 valid_values = []
                 for v in vec:
                     if v is not None and isinstance(v, (int, float)) and not (isinstance(v, float) and (v != v or v == float('inf') or v == float('-inf'))):
                         valid_values.append(float(v))
                     else:
-                        valid_values.append(0.0)  # Replace invalid values with 0
+                        valid_values.append(0.0)
 
                 if not valid_values:
                     return {"type": "vector", "error": "No valid numeric values in vector"}
 
-                # Calculate vector statistics
                 norm = float(sum(x*x for x in valid_values) ** 0.5) if valid_values else 0.0
                 vec_min = float(min(valid_values)) if valid_values else 0.0
                 vec_max = float(max(valid_values)) if valid_values else 0.0
                 vec_mean = float(sum(valid_values) / len(valid_values)) if valid_values else 0.0
 
-                # Special handling for CLIP vectors (typically 512 dimensions)
                 is_clip_vector = len(valid_values) == 512
 
                 result = {
@@ -94,25 +94,38 @@ def serialize_arrow_value(value):
                     "min": vec_min,
                     "max": vec_max,
                     "mean": vec_mean,
-                    "preview": valid_values[:32],  # Show first 32 values
+                    "preview": valid_values[:32],
                 }
 
                 if is_clip_vector:
                     result["model"] = "likely_clip"
                     result["description"] = "512-dimensional CLIP embedding"
-                    # For CLIP vectors, show some key statistics
                     result["stats"] = {
-                        "normalized": abs(norm - 1.0) < 0.01,  # CLIP vectors are typically normalized
+                        "normalized": abs(norm - 1.0) < 0.01,
                         "sparsity": sum(1 for x in valid_values if abs(x) < 0.01) / len(valid_values),
                         "positive_ratio": sum(1 for x in valid_values if x > 0) / len(valid_values)
                     }
-
                 return result
             except Exception as vec_error:
                 logger.warning(f"Error processing vector data: {vec_error}")
                 return {"type": "vector", "error": f"Vector processing failed: {str(vec_error)}"}
 
-        # Use the general serialize_value utility for all other types
+        # 2. Handle Structs recursively to catch vectors hidden inside objects
+        if pa.types.is_struct(value.type):
+            result = {}
+            for field in value.type:
+                # In PyArrow, value[field.name] fetches the nested pa.Scalar
+                result[field.name] = serialize_arrow_value(value[field.name])
+            return result
+
+        # 3. Handle Lists recursively (e.g., Arrays of Structs containing Vectors)
+        if pa.types.is_list(value.type) or pa.types.is_large_list(value.type) or pa.types.is_fixed_size_list(value.type):
+            result = []
+            for item in value:  # Iterating a PyArrow ListScalar yields nested pa.Scalars
+                result.append(serialize_arrow_value(item))
+            return result
+
+        # 4. Fallback to normal serialization for strings, ints, dates, etc.
         return serialize_value(value)
     except Exception as e:
         logger.warning(f"Error serializing value: {e}")
