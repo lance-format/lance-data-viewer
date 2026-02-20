@@ -249,7 +249,7 @@ class LanceViewer {
         this.elements.tableBody.innerHTML = '';
         rows.forEach(row => {
             const tr = document.createElement('tr');
-      columns.forEach(column => {
+            columns.forEach(column => {
                 const td = document.createElement('td');
                 const value = row[column];
 
@@ -257,10 +257,8 @@ class LanceViewer {
                     if (value.type === 'vector') {
                         this.renderVectorCell(td, value, column);
                     } else {
-                        // Clean UI fix for nested structs, dicts, and arrays
-                        const pre = document.createElement('pre');
-                        pre.textContent = JSON.stringify(value, null, 2);
-                        td.appendChild(pre);
+                        // Pass complex objects to our new recursive UI builder
+                        this.renderComplexObject(td, value, column);
                     }
                 } else {
                     td.textContent = value === null ? 'null' : String(value);
@@ -438,6 +436,180 @@ class LanceViewer {
         this.elements.dataError.textContent = message;
         this.elements.dataError.style.display = 'block';
         this.elements.dataLoading.style.display = 'none';
+    }
+
+
+    renderComplexObject(container, obj, name) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'complex-object-wrapper';
+        this._buildObjectDOM(wrapper, obj, name);
+        container.appendChild(wrapper);
+    }
+
+    _buildObjectDOM(parent, obj, currentKey) {
+        // 1. Handle Nulls
+        if (obj === null) {
+            const span = document.createElement('span');
+            span.className = 'co-null';
+            span.textContent = 'null';
+            parent.appendChild(span);
+            return;
+        }
+
+        // 2. Handle Primitives (Strings, Numbers, Booleans)
+        if (typeof obj !== 'object') {
+            const span = document.createElement('span');
+            span.className = typeof obj === 'string' ? 'co-string' : 'co-primitive';
+            span.textContent = typeof obj === 'string' ? `"${obj}"` : String(obj);
+            parent.appendChild(span);
+            return;
+        }
+
+        // 3. Handle Nested Vectors
+        if (obj.type === 'vector') {
+            // Wrap in a div to prevent renderVectorCell from overwriting container classes
+            const vecWrap = document.createElement('div');
+            this.renderVectorCell(vecWrap, obj, currentKey);
+            parent.appendChild(vecWrap);
+            return;
+        }
+
+       // 4. Handle Arrays
+        if (Array.isArray(obj)) {
+            const list = document.createElement('div');
+            list.className = 'co-list';
+
+            if (obj.length === 0) {
+                const span = document.createElement('span');
+                span.className = 'co-empty';
+                span.textContent = '[]';
+                parent.appendChild(span);
+                return;
+            }
+
+            const LIMIT = 5;
+            const hasHidden = obj.length > LIMIT;
+            let hiddenContainer = null;
+
+            obj.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'co-list-item';
+                
+                const prefix = document.createElement('span');
+                prefix.className = 'co-prefix';
+                prefix.textContent = `[${index}]: `;
+                itemDiv.appendChild(prefix);
+
+                if (item && typeof item === 'object') {
+                    const childContainer = document.createElement('div');
+                    childContainer.className = 'co-child-container';
+                    this._buildObjectDOM(childContainer, item, `${currentKey}[${index}]`);
+                    itemDiv.appendChild(childContainer);
+                } else {
+                    this._buildObjectDOM(itemDiv, item, `${currentKey}[${index}]`);
+                }
+
+                // If we pass the limit, push to the hidden container instead
+                if (hasHidden && index >= LIMIT) {
+                    if (!hiddenContainer) {
+                        hiddenContainer = document.createElement('div');
+                        hiddenContainer.style.display = 'none';
+                        list.appendChild(hiddenContainer);
+                    }
+                    hiddenContainer.appendChild(itemDiv);
+                } else {
+                    list.appendChild(itemDiv);
+                }
+            });
+
+            if (hasHidden) {
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'co-toggle-btn';
+                toggleBtn.textContent = `Show ${obj.length - LIMIT} more...`;
+                toggleBtn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent triggering row selection
+                    if (hiddenContainer.style.display === 'none') {
+                        hiddenContainer.style.display = 'block';
+                        toggleBtn.textContent = 'Show less';
+                    } else {
+                        hiddenContainer.style.display = 'none';
+                        toggleBtn.textContent = `Show ${obj.length - LIMIT} more...`;
+                    }
+                };
+                list.appendChild(toggleBtn);
+            }
+
+            parent.appendChild(list);
+            return;
+        }
+
+        // 5. Handle Standard Dictionaries/Structs
+        const dict = document.createElement('div');
+        dict.className = 'co-dict';
+
+        const keys = Object.keys(obj);
+        if (keys.length === 0) {
+            const span = document.createElement('span');
+            span.className = 'co-empty';
+            span.textContent = '{}';
+            parent.appendChild(span);
+            return;
+        }
+
+        const LIMIT = 5;
+        const hasHidden = keys.length > LIMIT;
+        let hiddenContainer = null;
+
+        keys.forEach((key, index) => {
+            const row = document.createElement('div');
+            row.className = 'co-dict-row';
+
+            const keySpan = document.createElement('strong');
+            keySpan.className = 'co-key';
+            keySpan.textContent = `${key}: `;
+            row.appendChild(keySpan);
+
+            const val = obj[key];
+            if (val && typeof val === 'object') {
+                const childContainer = document.createElement('div');
+                childContainer.className = 'co-child-container';
+                this._buildObjectDOM(childContainer, val, key);
+                row.appendChild(childContainer);
+            } else {
+                this._buildObjectDOM(row, val, key);
+            }
+
+            // If we pass the limit, push to the hidden container instead
+            if (hasHidden && index >= LIMIT) {
+                if (!hiddenContainer) {
+                    hiddenContainer = document.createElement('div');
+                    hiddenContainer.style.display = 'none';
+                    dict.appendChild(hiddenContainer);
+                }
+                hiddenContainer.appendChild(row);
+            } else {
+                dict.appendChild(row);
+            }
+        });
+
+        if (hasHidden) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'co-toggle-btn';
+            toggleBtn.textContent = `Show ${keys.length - LIMIT} more...`;
+            toggleBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (hiddenContainer.style.display === 'none') {
+                    hiddenContainer.style.display = 'block';
+                    toggleBtn.textContent = 'Show less';
+                } else {
+                    hiddenContainer.style.display = 'none';
+                    toggleBtn.textContent = `Show ${keys.length - LIMIT} more...`;
+                }
+            };
+            dict.appendChild(toggleBtn);
+        }
+        
+        parent.appendChild(dict);
     }
 }
 
