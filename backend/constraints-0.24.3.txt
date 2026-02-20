@@ -1,3 +1,4 @@
 # Constraints for lancedb 0.24.3 (recommended 2025)
 lancedb==0.24.3
+numpy<2.0
 pyarrow>=16,<22

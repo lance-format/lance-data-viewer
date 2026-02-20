@@ -1,3 +1,4 @@
 # Constraints for lancedb 0.16.0 (anchor stable)
 lancedb==0.16.0
+numpy<2.0
 pyarrow>=10,<17
