@@ -1,7 +1,7 @@
 FROM python:3.11-slim-bookworm AS builder
 
 # Build arguments for Lance version
-ARG LANCEDB_VERSION=0.3.4
+ARG LANCEDB_VERSION=0.29.2
 
 WORKDIR /build
 
@@ -38,7 +38,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -fsS http://localhost:8080/healthz || exit 1
 
 # Build arguments for labels (redeclare after FROM)
-ARG LANCEDB_VERSION=0.3.4
+ARG LANCEDB_VERSION=0.29.2
 
 LABEL org.opencontainers.image.title="Lance Data Viewer"
 LABEL org.opencontainers.image.description="Read-only web viewer for Lance datasets"
