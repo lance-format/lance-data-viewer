@@ -13,20 +13,23 @@ body {
 }
 
 .container {
-    max-width: 1600px;
     margin: 0 auto;
-    padding: 10px;
+    padding-top: 1.5vh;
+    padding-bottom: 1.5vh;
+    padding-left: 1.5vh;
+    padding-right: 1.5vh;
 }
 
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
     padding: 20px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 8vh;
+    margin-bottom: 2vh;
 }
 
 header h1 {
@@ -82,8 +85,8 @@ header h1 {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    max-height: 80vh;
     overflow-y: auto;
+    height: 87vh;
 }
 
 .sidebar-section {
@@ -126,12 +129,11 @@ header h1 {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    height: 87vh;
 }
 
 .dataset-header {
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #dee2e6;
+    overflow: scroll;
 }
 
 .data-section {
@@ -221,7 +223,6 @@ header h1 {
     padding: 10px;
     border-radius: 4px;
     border: 1px solid #dee2e6;
-    max-height: 150px;
     overflow-y: auto;
 }
 
@@ -239,7 +240,7 @@ header h1 {
 .table-container {
     overflow-x: auto;
     overflow-y: auto;
-    max-height: 70vh;
+    height: 82vh;
     border: 1px solid #dee2e6;
     border-radius: 6px;
     position: relative;
@@ -293,6 +294,7 @@ table tr:hover {
     padding: 4px;
     border-radius: 4px;
     border: 1px dashed #ced4da;
+    min-width: 175px;
 }
 
 .vector-info {
@@ -474,16 +476,22 @@ table tr:hover {
 
 /* --- Dynamic Word Wrap --- */
 table.wrap-text td {
-    min-width: 350px; /* Prevent very narrow columns when wrapping */
-    max-width: 700px;
+    max-width: 600px;
     white-space: normal;
     word-wrap: break-word;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 
 table.wrap-text .complex-object-wrapper {
     white-space: pre-wrap; 
     word-wrap: break-word;
+}
+
+.dt-plain-text,
+.long-text-wrapper {
+    min-width: 300px;
+    white-space: normal;
+    margin: 0;
 }
 
 .long-text-wrapper {
@@ -498,22 +506,49 @@ table.wrap-text .complex-object-wrapper {
 
 /* --- DataTables Custom Styling --- */
 #tableToolbarContainer {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: 15px;
 }
 
-/* Hide the original toolbar if it exists since we moved the filter */
-.table-toolbar {
-    display: none;
+.table-controls-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    background: #f8f9fa;
+    padding: 12px 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
 }
 
-.dataTables_filter {
-    width: 100%;
-    max-width: 400px;
+.dataTables_filter, .dt-search {
+    flex: 1;
+    min-width: 250px;
 }
 
-.dataTables_filter input {
+.wrap-text-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: #495057;
+    white-space: nowrap;
+    user-select: none;
+    padding: 0 5px;
+}
+
+.wrap-text-control input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.dataTables_filter input, .dt-search input, .dt-input {
     width: 100% !important;
     padding: 10px 15px !important;
     border: 1px solid #dee2e6 !important;
@@ -525,47 +560,152 @@ table.wrap-text .complex-object-wrapper {
     margin-left: 0 !important;
 }
 
-.dataTables_filter input:focus {
+.dataTables_filter input:focus, .dt-search input:focus, .dt-input:focus {
     background-color: white !important;
     border-color: #3498db !important;
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
 }
 
-/* Fix DataTable header sorting icons */
-table.dataTable thead th {
-    position: relative;
-    padding-right: 30px !important;
-    cursor: pointer;
+/* SearchBuilder specific styles to match our theme */
+.dtsb-searchBuilder {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 0px !important;
 }
 
-table.dataTable thead .sorting:after,
-table.dataTable thead .sorting_asc:after,
-table.dataTable thead .sorting_desc:after {
-    display: inline-block;
-    margin-left: 8px;
-    opacity: 0.3;
+.dtsb-title {
+    color: #2c3e50;
+    font-weight: 600 !important;
 }
 
-table.dataTable thead .sorting_asc:after {
-    content: "▲";
-    opacity: 1;
-    color: #3498db;
+/* Consolidate all controls */
+.dataTables_info, .dataTables_length, .dataTables_paginate, .dt-info, .dt-length, .dt-paging {
+    font-size: 0.85rem;
+    color: #4b5563;
+    display: flex;
+    align-items: center;
 }
 
-table.dataTable thead .sorting_desc:after {
-    content: "▼";
-    opacity: 1;
-    color: #3498db;
+.dataTables_length select, .dt-length select {
+    margin: 0 5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #d1d5db;
 }
 
-/* Hide the default DataTables sorting icons since we are using our custom ones */
-table.dataTable thead .sorting:before,
-table.dataTable thead .sorting_asc:before,
-table.dataTable thead .sorting_desc:before {
-    display: none !important;
+.dataTables_paginate, .dt-paging {
+    gap: 5px;
 }
 
-/* Ensure table container works well with DataTable */
-.table-container {
-    padding-top: 5px;
+.dataTables_paginate .paginate_button, .dt-paging .dt-paging-button {
+    padding: 4px 10px !important;
+    border-radius: 4px !important;
+    border: 1px solid #d1d5db !important;
+    background: white !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    margin: 0 2px !important;
 }
+
+.dataTables_paginate .paginate_button.current, .dt-paging .dt-paging-button.current {
+    background: #3498db !important;
+    color: white !important;
+    border-color: #3498db !important;
+}
+
+.dataTables_paginate .paginate_button:hover:not(.current), .dt-paging .dt-paging-button:hover:not(.current) {
+    background: #f3f4f6 !important;
+}
+
+.dataTables_processing {
+    background: rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+    border-radius: 8px !important;
+    border: 1px solid #dee2e6 !important;
+    color: #3498db !important;
+    font-weight: 600 !important;
+    padding: 15px !important;
+}
+
+
+
+
+/* --- Select2 Premium Styling --- */
+
+
+
+.select2-container--default .select2-selection--single,
+.select2-container--default .select2-selection--multiple {
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    min-height: 40px !important;
+    padding: 4px 8px !important;
+    background-color: #f8f9fa !important;
+    transition: all 0.2s ease !important;
+}
+
+.select2-container--default.select2-container--focus .select2-selection--single,
+.select2-container--default.select2-container--focus .select2-selection--multiple {
+    border-color: #3498db !important;
+    background-color: white !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
+    outline: none !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #2c3e50 !important;
+    line-height: 30px !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 38px !important;
+}
+
+.select2-dropdown {
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    overflow: hidden !important;
+    z-index: 1051 !important;
+}
+
+.select2-search--dropdown .select2-search__field {
+    border: 1px solid #dee2e6 !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+}
+
+.select2-results__option {
+    padding: 8px 12px !important;
+    font-size: 0.9rem !important;
+}
+
+.select2-results__option--highlighted[aria-selected] {
+    background-color: #3498db !important;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background-color: #e3f2fd !important;
+    border: 1px solid #bbdefb !important;
+    border-radius: 4px !important;
+    color: #1976d2 !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    margin-top: 4px !important;
+    padding: 2px 4px 2px 12px !important;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    color: #1976d2 !important;
+    margin-right: 5px !important;
+    border: none!important;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+    background-color: #bbdefb !important;
+    color: #0d47a1 !important;
+}
+

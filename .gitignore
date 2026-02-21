@@ -83,3 +83,6 @@ config.local.*
 # Build artifacts
 *.tar.gz
 *.zip
+
+# Web dependencies
+web/vanilla/vendor/

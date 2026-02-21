@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lance Data Viewer</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="vendor/datatables.min.css">
+    <link rel="stylesheet" href="vendor/select2.min.css">
 </head>
 
 <body>
@@ -49,9 +49,8 @@
                     <div class="header-row">
                         <h2 id="datasetTitle">Select a dataset</h2>
                         <div style="display: flex; align-items: center; gap: 20px;">
-                            <label
-                                style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; color: #495057;">
-                                <input type="checkbox" id="toggleWordWrap" checked> Wrap Text
+                            <label id="wrapTextLabel" class="wrap-text-control">
+                                <input type="checkbox" id="toggleWordWrap"> Wrap Text
                             </label>
                             <div class="pagination-controls">
                                 <button id="prevPage" disabled>Previous</button>
@@ -86,8 +85,8 @@
         <div class="tooltip-content"></div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="vendor/datatables.min.js"></script>
+    <script src="vendor/select2.min.js"></script>
     <script src="app.js"></script>
 </body>
 

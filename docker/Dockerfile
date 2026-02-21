@@ -9,6 +9,15 @@ COPY backend/requirements.txt backend/constraints-${LANCEDB_VERSION}.txt ./
 RUN pip install --no-cache-dir --user -c constraints-${LANCEDB_VERSION}.txt \
     -r requirements.txt
 
+# Download static dependencies for offline use
+FROM alpine:latest AS downloader
+RUN apk add --no-cache curl
+WORKDIR /download
+RUN curl -L -o datatables.min.css "https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.7/cr-2.1.2/date-1.6.3/sb-1.8.4/datatables.min.css" && \
+    curl -L -o datatables.min.js "https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.7/cr-2.1.2/date-1.6.3/sb-1.8.4/datatables.min.js"
+
+
+
 FROM python:3.11-slim-bookworm
 
 RUN groupadd -r appuser && useradd -r -g appuser -u 1001 appuser
@@ -23,6 +32,7 @@ WORKDIR /app
 
 COPY backend/*.py .
 COPY web/vanilla/ /web/
+COPY --from=downloader /download/* /web/vendor/
 
 RUN chown -R appuser:appuser /app /web
 RUN chmod -R 755 /web

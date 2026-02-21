@@ -8,10 +8,13 @@ import json
 
 import lancedb
 import pyarrow as pa
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+import duckdb
+from pydantic import BaseModel
+from typing import Any, Dict, List, Optional, Union
 from serialize_value import serialize_value
 
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +37,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -307,60 +310,19 @@ async def get_dataset_rows(
                 logger.info(f"Returned schema info for corrupted {dataset_name} dataset")
 
             else:
-                # For other datasets, try normal reading
-                logger.info(f"Attempting to read {dataset_name} using to_arrow().to_pylist() approach")
-
-                # This is the approach that works in the search API
-                data_list = table.to_arrow().to_pylist()
-                total_count = len(data_list)
-
-                # Apply pagination at the list level
-                start_idx = offset
-                end_idx = min(offset + limit, total_count)
-                paginated_data = data_list[start_idx:end_idx]
-
-                # Convert back to Arrow table for consistent processing
-                if paginated_data:
-                    # Get the schema from the original table
-                    schema = table.schema
-
-                    # Apply column selection if specified
-                    if column_list:
-                        # Filter the schema and data
-                        available_columns = [col for col in column_list if col in [field.name for field in schema]]
-                        if available_columns:
-                            # Create filtered data
-                            filtered_data = []
-                            for row in paginated_data:
-                                filtered_row = {col: row.get(col) for col in available_columns}
-                                filtered_data.append(filtered_row)
-                            paginated_data = filtered_data
-
-                            # Create filtered schema
-                            filtered_fields = [field for field in schema if field.name in available_columns]
-                            schema = pa.schema(filtered_fields)
-
-                    # Convert the paginated data back to Arrow format
-                    arrays = []
-                    for field in schema:
-                        column_data = [row.get(field.name) for row in paginated_data]
-                        arrays.append(pa.array(column_data, type=field.type))
-
-                    result_table = pa.Table.from_arrays(arrays, schema=schema)
-                else:
-                    # Empty result - create empty table with correct schema
-                    schema = table.schema
-                    if column_list:
-                        available_columns = [col for col in column_list if col in [field.name for field in schema]]
-                        if available_columns:
-                            filtered_fields = [field for field in schema if field.name in available_columns]
-                            schema = pa.schema(filtered_fields)
-
-                    # Create empty arrays for each field
-                    arrays = [pa.array([], type=field.type) for field in schema]
-                    result_table = pa.Table.from_arrays(arrays, schema=schema)
-
-                logger.info(f"Successfully read {len(paginated_data)} rows from {dataset_name}")
+                # For other datasets, use native LanceDB scanner for high-performance pagination
+                logger.info(f"Using LanceDB scanner for {dataset_name} pagination")
+                
+                total_count = table.count_rows()
+                
+                # Fetch only the requested page of data
+                scanner = table.scanner(
+                    columns=column_list,
+                    limit=limit,
+                    offset=offset
+                )
+                result_table = scanner.to_table()
+                logger.info(f"Successfully read {result_table.num_rows} rows from {dataset_name}")
 
         except Exception as general_error:
             logger.error(f"Reading failed for {dataset_name}: {general_error}")
@@ -422,7 +384,8 @@ async def get_vector_preview(
         if not ((pa.types.is_list(field.type) or pa.types.is_fixed_size_list(field.type)) and pa.types.is_floating(field.type.value_type)):
             raise HTTPException(status_code=400, detail=f"Column '{column}' is not a vector column")
 
-        result = table.to_arrow().select([column]).slice(0, limit)
+        # Use scanner to only load the requested column and limit
+        result = table.scanner(columns=[column], limit=limit).to_table()
         vectors = result.column(0).to_pylist()
 
         valid_vectors = [v for v in vectors if v is not None]
@@ -452,6 +415,242 @@ async def get_vector_preview(
     except Exception as e:
         logger.error(f"Error getting vector preview for {dataset_name}.{column}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get vector preview")
+
+class DataTablesRequest(BaseModel):
+    draw: int
+    start: int
+    length: int
+    search: Dict[str, Any]
+    order: List[Dict[str, Any]]
+    columns: List[Dict[str, Any]]
+    searchBuilder: Optional[Dict[str, Any]] = None
+
+def parse_searchbuilder_rules(rules: Dict[str, Any]) -> str:
+    """Recursively parse DataTables searchBuilder rules into SQL"""
+    # Handle both "rules"/"condition" and "criteria"/"logic" naming conventions
+    child_rules = rules.get("rules") or rules.get("criteria")
+    condition = rules.get("condition") or rules.get("logic")
+    
+    if child_rules is not None and condition is not None:
+        condition = condition.upper()  # Ensure AND/OR is uppercase
+        sql_parts = []
+        for rule in child_rules:
+            part = parse_searchbuilder_rules(rule)
+            if part:
+                sql_parts.append(part)
+        
+        if not sql_parts:
+            return ""
+            
+        joiner = f" {condition} "
+        return f"({joiner.join(sql_parts)})"
+    
+    # Base rule
+    field = rules.get("origData") or rules.get("data")
+    if field is None:
+        return ""
+        
+    cond = rules.get("condition")
+    if not cond:
+        return ""
+        
+    values = rules.get("value", [])
+    val1 = values[0] if len(values) > 0 else None
+    val2 = values[1] if len(values) > 1 else None
+    
+    # Safe column name quoting
+    col = f'"{field}"'
+    
+    # Helper to quote strings but leave numbers (if they are numbers)
+    def sql_val(v):
+        if v is None: return "NULL"
+        if isinstance(v, (int, float)): return str(v)
+        # Try to see if it's a numeric string
+        try:
+            if v.replace('.','',1).isdigit(): return v
+        except: pass
+        return f"'{v}'"
+
+    if cond == "=":
+        return f"{col} = {sql_val(val1)}"
+    elif cond == "!=":
+        return f"{col} != {sql_val(val1)}"
+    elif cond == "<":
+        return f"{col} < {sql_val(val1)}"
+    elif cond == "<=":
+        return f"{col} <= {sql_val(val1)}"
+    elif cond == ">":
+        return f"{col} > {sql_val(val1)}"
+    elif cond == ">=":
+        return f"{col} >= {sql_val(val1)}"
+    elif cond == "contains":
+        return f"CAST({col} AS VARCHAR) ILIKE '%{val1}%'"
+    elif cond == "!contains":
+        return f"CAST({col} AS VARCHAR) NOT ILIKE '%{val1}%'"
+    elif cond == "starts":
+        return f"CAST({col} AS VARCHAR) ILIKE '{val1}%'"
+    elif cond == "!starts":
+        return f"CAST({col} AS VARCHAR) NOT ILIKE '{val1}%'"
+    elif cond == "ends":
+        return f"CAST({col} AS VARCHAR) ILIKE '%{val1}'"
+    elif cond == "!ends":
+        return f"CAST({col} AS VARCHAR) NOT ILIKE '%{val1}'"
+    elif cond == "null":
+        return f"{col} IS NULL"
+    elif cond == "!null":
+        return f"{col} IS NOT NULL"
+    elif cond == "between":
+        return f"{col} BETWEEN {sql_val(val1)} AND {sql_val(val2)}"
+    elif cond == "!between":
+        return f"{col} NOT BETWEEN {sql_val(val1)} AND {sql_val(val2)}"
+        
+    return ""
+
+@app.post("/datasets/{dataset_name}/datatables")
+async def get_datatables_data(dataset_name: str, request: Request):
+    if not validate_dataset_name(dataset_name):
+        raise HTTPException(status_code=400, detail="Invalid dataset name")
+
+    try:
+        body = await request.body()
+        logger.info(f"Received datatables request for {dataset_name}. Body size: {len(body)}")
+        
+        try:
+            payload_dict = json.loads(body)
+            payload = DataTablesRequest(**payload_dict)
+        except Exception as json_err:
+            logger.error(f"Failed to parse JSON body: {json_err}. Body: {body[:500]}")
+            return {
+                "draw": 0,
+                "error": f"JSON Parse Error: {str(json_err)}",
+                "data": []
+            }
+        db = get_lance_connection()
+        table = db.open_table(dataset_name)
+        
+        # Get total records without filtering - very fast in Lance
+        recordsTotal = table.count_rows()
+        
+        # Connect to duckdb
+        con = duckdb.connect()
+        
+        # Register the dataset. Using to_lance() provides the underlying Dataset object,
+        # which DuckDB can scan lazily without materializing all rows into memory.
+        try:
+            # check if to_lance() exists, otherwise use the table object directly
+            # which might implement the arrow protocol
+            dataset_source = getattr(table, "to_lance", lambda: table)()
+            con.register('dataset', dataset_source)
+            logger.info(f"Registered dataset '{dataset_name}' lazily")
+        except Exception as reg_err:
+            logger.warning(f"Lazy registration failed for {dataset_name}: {reg_err}. Materializing as fallback.")
+            con.register('dataset', table.to_arrow())
+        
+        # Build SQL Query parts
+        where_clauses = []
+        
+        # 1. Global Search
+        search_value = payload.search.get("value")
+        if search_value:
+            global_search = []
+            for col in payload.columns:
+                if col.get("searchable") and col.get("data"):
+                    # Cast everything to string for global search
+                    col_name = col["data"]
+                    global_search.append(f"CAST(\"{col_name}\" AS VARCHAR) ILIKE '%{search_value}%'")
+            if global_search:
+                where_clauses.append(f"({' OR '.join(global_search)})")
+                
+        # 2. SearchBuilder
+        if payload.searchBuilder:
+            # support both "rules" and "criteria" formats
+            rules_key = "rules" if "rules" in payload.searchBuilder else "criteria"
+            if rules_key in payload.searchBuilder and payload.searchBuilder[rules_key]:
+                sb_sql = parse_searchbuilder_rules(payload.searchBuilder)
+                if sb_sql:
+                    where_clauses.append(sb_sql)
+                
+        # 3. Column specific searches
+        for col in payload.columns:
+            if col.get("searchable") and col.get("search") and col["search"].get("value"):
+                col_val = col["search"]["value"]
+                col_name = col["data"]
+                where_clauses.append(f"CAST(\"{col_name}\" AS VARCHAR) ILIKE '%{col_val}%'")
+
+        where_sql = ""
+        if where_clauses:
+            where_sql = f" WHERE {' AND '.join(where_clauses)}"
+            
+        logger.info(f"Final WHERE clause: {where_sql}")
+            
+        # Build Order By
+        order_sql = ""
+        if payload.order:
+            order_parts = []
+            for order in payload.order:
+                col_idx = order.get("column")
+                if col_idx is not None and col_idx < len(payload.columns):
+                    col_name = payload.columns[col_idx].get("data")
+                    if col_name:
+                        dir = order.get("dir", "asc").upper()
+                        if dir not in ["ASC", "DESC"]: 
+                            dir = "ASC"
+                        order_parts.append(f"\"{col_name}\" {dir}")
+            
+            if order_parts:
+                order_sql = f" ORDER BY {', '.join(order_parts)}"
+                
+        # Get total records after filtering
+        if where_clauses:
+            count_query = f"SELECT COUNT(*) FROM dataset {where_sql}"
+            recordsFiltered = con.execute(count_query).fetchone()[0]
+        else:
+            recordsFiltered = recordsTotal
+        
+        # Get the actual page of data
+        limit = payload.length
+        offset = payload.start
+        
+        data_query = f"SELECT * FROM dataset {where_sql} {order_sql}"
+        logger.info(f"Executing data query: {data_query}")
+        if limit > 0:  # DataTables uses -1 for "All"
+            data_query += f" LIMIT {limit} OFFSET {offset}"
+            
+        result_arrow = con.execute(data_query).arrow()
+        
+        # duckdb .arrow() might return a RecordBatchReader in some versions,
+        # so we need to collect it into a Table
+        if hasattr(result_arrow, "read_all"):
+            result_arrow = result_arrow.read_all()
+            
+        # Process result rows just like the standard /rows endpoint
+        rows = []
+        for i in range(result_arrow.num_rows):
+            row = {}
+            for j, column_name in enumerate(result_arrow.column_names):
+                try:
+                    value = result_arrow.column(j)[i]
+                    row[column_name] = serialize_arrow_value(value)
+                except Exception as serialize_error:
+                    logger.warning(f"Failed to serialize column {column_name} at row {i}: {serialize_error}")
+                    row[column_name] = {"error": "Failed to read value"}
+            rows.append(row)
+            
+        return {
+            "draw": payload.draw,
+            "recordsTotal": recordsTotal,
+            "recordsFiltered": recordsFiltered,
+            "data": rows
+        }
+
+    except Exception as e:
+        logger.error(f"Error entirely: {e}")
+        return {
+            "draw": payload.draw,
+            "error": str(e),
+            "data": []
+        }
+
 
 # Mount static files - use vanilla version by default
 # In production, Docker copies vanilla files to /web

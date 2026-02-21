@@ -12,6 +12,7 @@ class LanceViewer {
         this.setupEventListeners();
         this.checkHealth();
         this.loadDatasets();
+        this.initializeSelect2();
     }
 
     initializeElements() {
@@ -38,8 +39,24 @@ class LanceViewer {
             selectNoneCols: document.getElementById('selectNoneCols'),
             applyColumns: document.getElementById('applyColumns'),
             tooltip: document.getElementById('tooltip'),
-            toggleWordWrap: document.getElementById('toggleWordWrap')
+            toggleWordWrap: document.getElementById('toggleWordWrap'),
+            wrapTextLabel: document.getElementById('wrapTextLabel')
         };
+    }
+
+    initializeSelect2() {
+        // Initialize Select2 ONLY on the column selector
+        setTimeout(() => {
+            const $colSelect = $('#columnSelect');
+            if ($colSelect.length && !$colSelect.data('select2')) {
+                $colSelect.select2({
+                    width: '100%',
+                    dropdownParent: $colSelect.parent(),
+                    placeholder: 'Select columns...',
+                    allowClear: true
+                });
+            }
+        }, 100);
     }
 
     setupEventListeners() {
@@ -56,6 +73,13 @@ class LanceViewer {
         this.elements.applyColumns.addEventListener('click', () => this.applyColumnSelection());
 
         document.addEventListener('mousemove', (e) => this.updateTooltipPosition(e));
+
+        window.addEventListener('hashchange', () => {
+            const hash = decodeURIComponent(window.location.hash.substring(1));
+            if (hash && hash !== this.currentDataset) {
+                this.selectDataset(hash);
+            }
+        });
 
         this.elements.toggleWordWrap.addEventListener('change', (e) => {
             if (e.target.checked) {
@@ -114,10 +138,19 @@ class LanceViewer {
             data.datasets.forEach(dataset => {
                 const item = document.createElement('div');
                 item.className = 'dataset-item';
+                item.setAttribute('data-name', dataset);
                 item.textContent = dataset;
-                item.addEventListener('click', () => this.selectDataset(dataset));
+                item.addEventListener('click', () => {
+                    window.location.hash = encodeURIComponent(dataset);
+                });
                 this.elements.datasetList.appendChild(item);
             });
+
+            // Handle initial direct link via hash
+            const initialHash = decodeURIComponent(window.location.hash.substring(1));
+            if (initialHash && data.datasets.includes(initialHash)) {
+                this.selectDataset(initialHash);
+            }
         } catch (error) {
             this.elements.datasetList.innerHTML = '<div class="error">Failed to load datasets</div>';
         }
@@ -125,10 +158,14 @@ class LanceViewer {
 
     async selectDataset(datasetName) {
         document.querySelectorAll('.dataset-item').forEach(item => {
-            item.classList.remove('active');
+            if (item.getAttribute('data-name') === datasetName) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
         });
 
-        event.target.classList.add('active');
+        if (this.currentDataset === datasetName) return;
 
         this.currentDataset = datasetName;
         this.currentPage = 0;
@@ -195,6 +232,9 @@ class LanceViewer {
             this.elements.columnSelect.style.display = 'block';
             this.elements.columnSelect.parentElement.querySelector('.column-controls').style.display = 'flex';
             this.elements.columnSection.style.display = 'block';
+            
+            // Re-initialize Select2 for the updated columns
+            this.initializeSelect2();
         } catch (error) {
             this.showError('Failed to load columns');
         }
@@ -220,105 +260,171 @@ class LanceViewer {
 
     async loadData() {
         if (!this.currentDataset) return;
+        
+        // Hide our native pagination and controls since DataTables handles it
+        this.elements.pageSize.parentElement.style.display = 'none';
 
-        this.showLoading();
+        // Prepare columns array for DataTables
+        const dtColumns = this.selectedColumns.map(colName => {
+            return {
+                data: colName,
+                name: colName,
+                title: colName,
+                searchable: true,
+                orderable: true,
+                render: (data, type, row, meta) => {
+                    // DataTables calls render for different property types
+                    // We only want to transform for display
+                    if (type !== 'display') return data;
+                    
+                    if (data && typeof data === 'object') {
+                        if (data.type === 'vector') {
+                            // We return a placeholder div that we'll populate after draw
+                            return `<div class="dt-vector-placeholder" data-row="${meta.row}" data-col="${colName}"></div>`;
+                        } else if (data.error) {
+                            return `<span class="co-primitive">Error: ${data.error}</span>`;
+                        } else {
+                            // Complex object placeholder
+                            return `<div class="dt-complex-placeholder" data-row="${meta.row}" data-col="${colName}"></div>`;
+                        }
+                    }
+                    
+                    // Simple text wrapping
+                    if (typeof data === 'string') {
+                        if (data.length > 500) {
+                            return `<div class="dt-longtext-placeholder" data-row="${meta.row}" data-col="${colName}"></div>`;
+                        } else if (data.length >= 40) {
+                            return `<p class="dt-plain-text">${String(data)}</p>`;
+                        }
+                    }
+                    
+                    return data === null ? '<span class="co-null">null</span>' : String(data);
+                }
+            };
+        });
 
-        try {
-            const params = new URLSearchParams({
-                limit: this.pageSize.toString(),
-                offset: (this.currentPage * this.pageSize).toString()
-            });
-
-            if (this.selectedColumns.length > 0 && this.selectedColumns.length < this.allColumns.length) {
-                params.append('columns', this.selectedColumns.join(','));
-            }
-
-            const response = await fetch(`${this.apiBase}/datasets/${this.currentDataset}/rows?${params}`);
-            const data = await response.json();
-
-            this.totalRows = data.total;
-            this.renderTable(data.rows);
-            this.updatePagination();
-            this.hideLoading();
-
-        } catch (error) {
-            this.hideLoading();
-            this.showError('Failed to load data');
-        }
-    }
-
-    renderTable(rows) {
-        // Destroy existing DataTable if it exists
+        // Destroy existing instance if it exists
         if ($.fn.DataTable.isDataTable('#dataTable')) {
             $('#dataTable').DataTable().destroy();
-            // Clear headers and body as destroy might leave artifacts
             this.elements.tableHead.innerHTML = '';
             this.elements.tableBody.innerHTML = '';
         }
 
-        if (rows.length === 0) {
-            this.elements.tableBody.innerHTML = '<tr><td colspan="100%">No data found</td></tr>';
-            return;
-        }
-
-        const columns = Object.keys(rows[0]);
-
-        this.elements.tableHead.innerHTML = '';
-        const headerRow = document.createElement('tr');
-        columns.forEach(column => {
-            const th = document.createElement('th');
-            th.textContent = column;
-            headerRow.appendChild(th);
-        });
-        this.elements.tableHead.appendChild(headerRow);
-
-        this.elements.tableBody.innerHTML = '';
-        rows.forEach(row => {
-            const tr = document.createElement('tr');
-            columns.forEach(column => {
-                const td = document.createElement('td');
-                const value = row[column];
-
-                if (value && typeof value === 'object') {
-                    if (value.type === 'vector') {
-                        this.renderVectorCell(td, value, column);
-                    } else {
-                        // Pass complex objects to our new recursive UI builder
-                        this.renderComplexObject(td, value, column);
-                    }
-                } else {
-                    this.renderLongText(td, value === null ? 'null' : String(value));
-                }
-
-                tr.appendChild(td);
-            });
-            this.elements.tableBody.appendChild(tr);
-        });
-
         this.elements.dataSection.style.display = 'block';
 
-        // Initialize DataTable
+        const self = this;
+        
+        // Initialize DataTable with Server-Side Processing
         const table = $('#dataTable').DataTable({
-            paging: false,
-            searching: true,
-            info: false,
-            order: [], // Don't apply initial sort, keep as loaded
-            scrollX: false, // Let our own container handle scrolling
-            autoWidth: false,
-            dom: '<"table-toolbar"f>t', // Only show filter (searchbox)
+            serverSide: true,
+            processing: true,
+            fixedHeader: {
+                header: true,
+                footer: false
+            },
+            colReorder: true,
+            ajax: (data, callback, settings) => {
+                fetch(`${this.apiBase}/datasets/${this.currentDataset}/datatables`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw err; });
+                    }
+                    return response.json();
+                })
+                .then(json => {
+                    callback(json);
+                })
+                .catch(error => {
+                    console.error('DataTables Ajax Error:', error);
+                    let msg = error.message || 'Unknown error';
+                    if (error.detail) msg = JSON.stringify(error.detail);
+                    self.showError('DataTables Error: ' + msg);
+                    callback({
+                        draw: data.draw,
+                        recordsTotal: 0,
+                        recordsFiltered: 0,
+                        data: []
+                    });
+                });
+            },
+            columns: dtColumns,
+            order: [], // Default no ordering
+            pageLength: this.pageSize,
+            lengthMenu: [25, 50, 100, 200, 500, 1000],
+            dom: '<"table-controls-top"lfpi>Qrt',
+            searchBuilder: {
+                logic: 'AND',
+                liveSearch: false
+            },
             language: {
                 search: "",
-                searchPlaceholder: "Search current page..."
+                searchPlaceholder: "Search global...",
+                processing: "Loading data from LanceDB..."
+            },
+            drawCallback: function(settings) {
+                const api = this.api();
+                const data = api.rows({page: 'current'}).data();
+                
+                // After table drawing, find placeholders and inject our custom vanilla JS renderers
+                $(api.table().body()).find('.dt-vector-placeholder').each(function() {
+                    const rowIdx = $(this).data('row');
+                    const colName = $(this).data('col');
+                    const cellData = data[rowIdx][colName];
+                    self.renderVectorCell(this, cellData, colName);
+                });
+                
+                $(api.table().body()).find('.dt-complex-placeholder').each(function() {
+                    const rowIdx = $(this).data('row');
+                    const colName = $(this).data('col');
+                    const cellData = data[rowIdx][colName];
+                    self.renderComplexObject(this, cellData, colName);
+                });
+                
+                $(api.table().body()).find('.dt-longtext-placeholder').each(function() {
+                    const rowIdx = $(this).data('row');
+                    const colName = $(this).data('col');
+                    const cellData = data[rowIdx][colName];
+                    self.renderLongText(this, cellData);
+                });
             }
         });
 
-        // Move the search bar to our external container to keep it fixed while scrolling
+        // Sync page size changes back to our property just in case
+        table.on('length.dt', function(e, settings, len) {
+            self.pageSize = len;
+            self.elements.pageSize.value = len;
+        });
+
+        // Move all controls to the external container
         const toolbarContainer = document.getElementById('tableToolbarContainer');
         toolbarContainer.innerHTML = '';
-        const dtFilter = this.elements.dataSection.querySelector('.dataTables_filter');
-        if (dtFilter) {
-            toolbarContainer.appendChild(dtFilter);
+        
+        // Move SearchBuilder
+        const dtsb = this.elements.dataSection.querySelector('.dtsb-searchBuilder');
+        if (dtsb) {
+            toolbarContainer.appendChild(dtsb);
         }
+        
+        // Move Combined Controls
+        const dtControls = this.elements.dataSection.querySelector('.table-controls-top');
+        if (dtControls) {
+            // Move Wrap Text toggle to the left of the search bar
+            const searchBar = dtControls.querySelector('.dataTables_filter, .dt-search');
+            if (this.elements.wrapTextLabel && searchBar) {
+                searchBar.parentNode.insertBefore(this.elements.wrapTextLabel, searchBar);
+            }
+            toolbarContainer.appendChild(dtControls);
+        }
+    }
+
+    renderTable(rows) {
+        // Obsolete: DataTables handles rendering now.
     }
 
     renderVectorCell(cell, vectorData, columnName) {
