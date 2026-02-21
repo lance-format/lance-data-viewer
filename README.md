@@ -1,10 +1,10 @@
-
-
 # Lance Data Viewer - A read-only web UI for Lance datasets
 
-Browse Lance tables from your local machine in a simple web UI. No database to set up. Mount a folder and go.
+Browse Lance tables from your local machine in a simple web UI. No database to
+set up. Mount a folder and go.
 
-**✨ Multi-Version Support**: Built for different Lance versions to ensure compatibility with your data format.
+**✨ Multi-Version Support**: Built for different Lance versions to ensure
+compatibility with your data format.
 
 ![Lance Data Viewer Screenshot](lance_data_viewer_screenshot.png)
 
@@ -38,23 +38,25 @@ docker run --rm -p 8080:8080 \
 http://localhost:8080
 ```
 
-The UI will display the Lance version in the top-right corner for easy identification.
+The UI will display the Lance version in the top-right corner for easy
+identification.
 
 ### What counts as "Lance data" here?
 
-A folder containing Lance tables (as created by Lance/LanceDB). The app lists tables under `/data`.
+A folder containing Lance tables (as created by Lance/LanceDB). The app lists
+tables under `/data`.
 
 ## Available Lance Versions
 
 Choose the container that matches your Lance data format:
 
-| Container Tag | Lance Version | PyArrow | Use Case |
-|--------------|---------------|---------|----------|
-| `lancedb-0.24.3` | 0.24.3 | 21.0.0 | **Recommended** - Modern stable version |
-| `lancedb-0.16.0` | 0.16.0 | 16.1.0 | Anchor stable for older datasets |
-| `lancedb-0.5` | 0.5.0 | 14.0.1 | Legacy support |
-| `lancedb-0.3.4` | 0.3.4 | 14.0.1 | Legacy support |
-| `lancedb-0.3.1` | 0.3.1 | 14.0.1 | Legacy support |
+| Container Tag    | Lance Version | PyArrow | Use Case                                |
+| ---------------- | ------------- | ------- | --------------------------------------- |
+| `lancedb-0.24.3` | 0.24.3        | 21.0.0  | **Recommended** - Modern stable version |
+| `lancedb-0.16.0` | 0.16.0        | 16.1.0  | Anchor stable for older datasets        |
+| `lancedb-0.5`    | 0.5.0         | 14.0.1  | Legacy support                          |
+| `lancedb-0.3.4`  | 0.3.4         | 14.0.1  | Legacy support                          |
+| `lancedb-0.3.1`  | 0.3.1         | 14.0.1  | Legacy support                          |
 
 ### Viewing older Lance data
 
@@ -72,14 +74,19 @@ docker run --rm -p 8080:8080 \
     ghcr.io/gordonmurray/lance-data-viewer:lancedb-0.3.4
 ```
 
-**Tip**: If you're unsure which version to use, start with `lancedb-0.24.3` and if you get compatibility errors, try progressively older versions.
+**Tip**: If you're unsure which version to use, start with `lancedb-0.24.3` and
+if you get compatibility errors, try progressively older versions.
 
 ### Features
 
-- **Read-only browsing** with organized left sidebar (Datasets → Columns → Schema)
-- **Advanced vector visualization** with CLIP embedding detection and sparkline charts
+- **Read-only browsing** with organized left sidebar (Datasets → Columns →
+  Schema)
+- **Advanced vector visualization** with CLIP embedding detection and sparkline
+  charts
 - **Schema analysis** with vector column highlighting and type detection
-- **Server-side pagination** with inline controls and column filtering
+- **Server-side search, ordering, and pagination** powered by
+  [DataTables](https://datatables.net/)
+- **Advanced query builder** for complex filtering and search builder rules
 - **Robust error handling** - gracefully handles corrupted datasets
 - **Responsive layout** optimized for data viewing
 
@@ -144,6 +151,7 @@ curl http://localhost:8080/healthz | jq '.lancedb_version'
 ## Supported Data Types
 
 ### ✅ Fully Supported
+
 - **Standard types**: string, int, float, timestamp, boolean, null
 - **Modern vectors**: `Vector(dim)` fields (LanceDB 2024+ style)
 - **Fixed-size vectors**: `fixed_size_list<item: float>[N]` (e.g., CLIP-512)
@@ -151,11 +159,14 @@ curl http://localhost:8080/healthz | jq '.lancedb_version'
 - **Indexed datasets**: properly created with IVF/HNSW indexes
 
 ### ⚠️ Limited Support
-- **Legacy vectors**: `pa.list_(pa.float32(), dim)` - schema only, may show corruption warnings
+
+- **Legacy vectors**: `pa.list_(pa.float32(), dim)` - schema only, may show
+  corruption warnings
 - **Large vectors**: >2048 dimensions show preview only
 - **Corrupted data**: graceful degradation with informative error messages
 
 ### ❌ Not Supported
+
 - Binary vectors (uint8 arrays)
 - Multi-vector columns
 - Custom user-defined types
@@ -174,5 +185,6 @@ The viewer provides advanced visualization for vector embeddings:
 ### Security Notes
 
 - Container runs as non-root
-- No authentication; bind to localhost during development and run behind a reverse proxy if exposing
+- No authentication; bind to localhost during development and run behind a
+  reverse proxy if exposing
 - Read-only access prevents accidental data modification
