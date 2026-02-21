@@ -63,7 +63,16 @@ class LanceViewer {
             } else {
                 this.elements.dataTable.classList.remove('wrap-text');
             }
+            // Trigger DataTable redraw to adjust for layout changes
+            if ($.fn.DataTable.isDataTable('#dataTable')) {
+                $('#dataTable').DataTable().columns.adjust();
+            }
         });
+
+        // Initialize default state
+        if (this.elements.toggleWordWrap.checked) {
+            this.elements.dataTable.classList.add('wrap-text');
+        }
     }
 
     async checkHealth() {
@@ -239,6 +248,14 @@ class LanceViewer {
     }
 
     renderTable(rows) {
+        // Destroy existing DataTable if it exists
+        if ($.fn.DataTable.isDataTable('#dataTable')) {
+            $('#dataTable').DataTable().destroy();
+            // Clear headers and body as destroy might leave artifacts
+            this.elements.tableHead.innerHTML = '';
+            this.elements.tableBody.innerHTML = '';
+        }
+
         if (rows.length === 0) {
             this.elements.tableBody.innerHTML = '<tr><td colspan="100%">No data found</td></tr>';
             return;
@@ -270,7 +287,7 @@ class LanceViewer {
                         this.renderComplexObject(td, value, column);
                     }
                 } else {
-                    td.textContent = value === null ? 'null' : String(value);
+                    this.renderLongText(td, value === null ? 'null' : String(value));
                 }
 
                 tr.appendChild(td);
@@ -279,6 +296,29 @@ class LanceViewer {
         });
 
         this.elements.dataSection.style.display = 'block';
+
+        // Initialize DataTable
+        const table = $('#dataTable').DataTable({
+            paging: false,
+            searching: true,
+            info: false,
+            order: [], // Don't apply initial sort, keep as loaded
+            scrollX: false, // Let our own container handle scrolling
+            autoWidth: false,
+            dom: '<"table-toolbar"f>t', // Only show filter (searchbox)
+            language: {
+                search: "",
+                searchPlaceholder: "Search current page..."
+            }
+        });
+
+        // Move the search bar to our external container to keep it fixed while scrolling
+        const toolbarContainer = document.getElementById('tableToolbarContainer');
+        toolbarContainer.innerHTML = '';
+        const dtFilter = this.elements.dataSection.querySelector('.dataTables_filter');
+        if (dtFilter) {
+            toolbarContainer.appendChild(dtFilter);
+        }
     }
 
     renderVectorCell(cell, vectorData, columnName) {
@@ -469,8 +509,13 @@ class LanceViewer {
         if (typeof obj !== 'object') {
             const span = document.createElement('span');
             span.className = typeof obj === 'string' ? 'co-string' : 'co-primitive';
-            span.textContent = typeof obj === 'string' ? `"${obj}"` : String(obj);
-            parent.appendChild(span);
+            
+            if (typeof obj === 'string') {
+                this.renderLongText(parent, `"${obj}"`, true);
+            } else {
+                span.textContent = String(obj);
+                parent.appendChild(span);
+            }
             return;
         }
 
@@ -619,6 +664,41 @@ class LanceViewer {
         }
         
         parent.appendChild(dict);
+    }
+    
+    renderLongText(container, text, isCodeStyle = false) {
+        const THRESHOLD = 500;
+        if (!text || text.length <= THRESHOLD) {
+            const span = document.createElement('span');
+            if (isCodeStyle) span.className = 'co-string';
+            span.textContent = text;
+            container.appendChild(span);
+            return;
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'long-text-wrapper';
+        
+        const textSpan = document.createElement('span');
+        textSpan.className = isCodeStyle ? 'co-string text-content' : 'text-content';
+        const truncated = text.substring(0, THRESHOLD) + '...';
+        textSpan.textContent = truncated;
+        
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'co-toggle-btn';
+        toggleBtn.textContent = 'Show more';
+        
+        let isExpanded = false;
+        toggleBtn.onclick = (e) => {
+            e.stopPropagation();
+            isExpanded = !isExpanded;
+            textSpan.textContent = isExpanded ? text : (text.substring(0, THRESHOLD) + '...');
+            toggleBtn.textContent = isExpanded ? 'Show less' : 'Show more';
+        };
+
+        wrapper.appendChild(textSpan);
+        wrapper.appendChild(toggleBtn);
+        container.appendChild(wrapper);
     }
 }
 
