@@ -22,8 +22,10 @@ COPY --from=builder /root/.local /home/appuser/.local
 WORKDIR /app
 
 COPY backend/*.py .
+COPY docker/entrypoint.sh /app/entrypoint.sh
 COPY web/vanilla/ /web/
 
+RUN chmod +x /app/entrypoint.sh
 RUN chown -R appuser:appuser /app /web
 RUN chmod -R 755 /web
 
@@ -47,4 +49,4 @@ LABEL org.opencontainers.image.version="0.1.0"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL com.github.lancedb.version="${LANCEDB_VERSION}"
 
-CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+ENTRYPOINT ["/app/entrypoint.sh"]
