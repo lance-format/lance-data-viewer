@@ -14,7 +14,7 @@ Browse Lance tables from your local machine in a simple web UI. No database to s
 
 ```bash
 # Modern stable version (recommended for new projects)
-docker pull ghcr.io/gordonmurray/lance-data-viewer:lancedb-0.24.3
+docker pull ghcr.io/lance-format/lance-data-viewer:lancedb-0.29.2
 ```
 
 2. **Make your data readable (required)**
@@ -29,7 +29,7 @@ chmod -R o+rx /path/to/your/lance
 ```bash
 docker run --rm -p 8080:8080 \
     -v /path/to/your/lance:/data:ro \
-    ghcr.io/gordonmurray/lance-data-viewer:lancedb-0.24.3
+    ghcr.io/lance-format/lance-data-viewer:lancedb-0.29.2
 ```
 
 4. **Open the UI**
@@ -50,7 +50,8 @@ Choose the container that matches your Lance data format:
 
 | Container Tag | Lance Version | PyArrow | Use Case |
 |--------------|---------------|---------|----------|
-| `lancedb-0.24.3` | 0.24.3 | 21.0.0 | **Recommended** - Modern stable version |
+| `lancedb-0.29.2` | 0.29.2 | 21.0.0 | **Recommended** - Latest stable version |
+| `lancedb-0.24.3` | 0.24.3 | 21.0.0 | Modern stable version |
 | `lancedb-0.16.0` | 0.16.0 | 16.1.0 | Anchor stable for older datasets |
 | `lancedb-0.5` | 0.5.0 | 14.0.1 | Legacy support |
 | `lancedb-0.3.4` | 0.3.4 | 14.0.1 | Legacy support |
@@ -64,12 +65,12 @@ If you have datasets created with older Lance versions:
 # For datasets created with Lance 0.16.x
 docker run --rm -p 8080:8080 \
     -v /path/to/your/old/lance/data:/data:ro \
-    ghcr.io/gordonmurray/lance-data-viewer:lancedb-0.16.0
+    ghcr.io/lance-format/lance-data-viewer:lancedb-0.16.0
 
 # For very old datasets (Lance 0.3.x era)
 docker run --rm -p 8080:8080 \
     -v /path/to/your/legacy/data:/data:ro \
-    ghcr.io/gordonmurray/lance-data-viewer:lancedb-0.3.4
+    ghcr.io/lance-format/lance-data-viewer:lancedb-0.3.4
 ```
 
 **Tip**: If you're unsure which version to use, start with `lancedb-0.24.3` and if you get compatibility errors, try progressively older versions.
@@ -85,19 +86,24 @@ docker run --rm -p 8080:8080 \
 
 ### Configuration (optional)
 
-- **Port:** change host port with `-p 9000:8080`.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATA_PATH` | `/data` | Directory containing Lance tables |
+| `PORT` | `8080` | Port the server listens on |
+
+- **Port:** change host port with `-p 9000:8080`, or set `PORT` env var to change the container's listening port.
 - **Read-only mount:** keep `:ro` to avoid accidental writes in future versions.
 
 ### Images & registries
 
-- **GitHub Container Registry** (`ghcr.io/gordonmurray/lance-data-viewer:TAG`).
+- **GitHub Container Registry**: `ghcr.io/lance-format/lance-data-viewer:TAG`
 
 ### Build and test locally
 
 ```bash
-# Build with specific Lance version (default: 0.3.4)
+# Build with specific Lance version (default: 0.29.2)
 docker build -f docker/Dockerfile \
-    --build-arg LANCEDB_VERSION=0.24.3 \
+    --build-arg LANCEDB_VERSION=0.29.2 \
     -t lance-data-viewer:dev .
 
 # Build multiple versions for testing
