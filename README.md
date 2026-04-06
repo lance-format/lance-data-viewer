@@ -88,6 +88,24 @@ docker run --rm -p 8080:8080 \
 - **Port:** change host port with `-p 9000:8080`.
 - **Read-only mount:** keep `:ro` to avoid accidental writes in future versions.
 
+### Docker Compose
+
+For pipelines or multi-container setups where lance-data-viewer shares a data volume with other services:
+
+```yaml
+services:
+  lance-viewer:
+    image: ghcr.io/lance-format/lance-data-viewer:lancedb-0.24.3
+    environment:
+      DATA_PATH: /data
+    volumes:
+      - lance-data:/data:ro
+    ports:
+      - "8888:8080"
+```
+
+Port 8080 is the default inside the container. The example maps to 8888 on the host to avoid conflicts with services like Airflow or Jenkins that also use 8080.
+
 ### Images & registries
 
 - **GitHub Container Registry** (`ghcr.io/gordonmurray/lance-data-viewer:TAG`).
