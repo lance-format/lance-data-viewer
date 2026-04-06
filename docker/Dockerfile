@@ -33,11 +33,12 @@ USER appuser
 
 ENV PATH=/home/appuser/.local/bin:$PATH
 ENV DATA_PATH=/data
+ENV PORT=8080
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -fsS http://localhost:8080/healthz || exit 1
+    CMD curl -fsS http://localhost:${PORT}/healthz || exit 1
 
 # Build arguments for labels (redeclare after FROM)
 ARG LANCEDB_VERSION=0.29.2
