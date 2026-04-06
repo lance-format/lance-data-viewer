@@ -8,6 +8,7 @@ import json
 
 import lancedb
 import pyarrow as pa
+from packaging.version import parse as parse_version
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -126,8 +127,8 @@ async def health_check():
         # Determine compatibility features based on Lance version
         compat = {
             "vector_preview": True,
-            "schema_evolution": lancedb_version >= "0.5",
-            "lance_v2_format": lancedb_version >= "0.16"
+            "schema_evolution": parse_version(lancedb_version) >= parse_version("0.5"),
+            "lance_v2_format": parse_version(lancedb_version) >= parse_version("0.16")
         }
 
         # Generate build tag
