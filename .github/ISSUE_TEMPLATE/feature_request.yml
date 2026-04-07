@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a new feature or enhancement
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature. Before filing, please read the
+        design constraints in [CONTRIBUTING.md](https://github.com/lance-format/lance-data-viewer/blob/main/CONTRIBUTING.md).
+        Proposals that conflict with those constraints are unlikely to be
+        accepted without a strong justification.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the feature.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What problem does this solve? Who benefits and how?
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: If you have an implementation sketch, share it here. Optional.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Design constraint check
+      description: |
+        Confirm the proposal is compatible with the project's load-bearing
+        design constraints:
+        - Vanilla JS with no build step
+        - GET-only, stateless API
+        - No metadata database
+        - No in-app authentication
+        - Read-only access
+      options:
+        - label: "I have read CONTRIBUTING.md and this proposal does not conflict with the load-bearing design constraints."
+          required: true
