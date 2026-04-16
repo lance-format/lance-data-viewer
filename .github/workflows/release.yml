@@ -26,6 +26,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Read app version
+      id: version
+      run: echo "app_version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -46,6 +50,7 @@ jobs:
           type=ref,event=branch,suffix=-lancedb-${{ matrix.lancedb }}
           type=ref,event=pr,suffix=-lancedb-${{ matrix.lancedb }}
           type=semver,pattern=app-{{version}}_lancedb-${{ matrix.lancedb }}
+          type=semver,pattern=v{{version}},enable=${{ matrix.lancedb == '0.29.2' && startsWith(github.ref, 'refs/tags/') }}
           type=raw,value=lancedb-${{ matrix.lancedb }}
           type=raw,value=latest,enable=${{ matrix.lancedb == '0.29.2' && github.ref == 'refs/heads/main' }}
           type=raw,value=stable,enable=${{ matrix.lancedb == '0.29.2' && startsWith(github.ref, 'refs/tags/') }}
@@ -63,6 +68,7 @@ jobs:
         cache-to: type=gha,mode=max,scope=lancedb-${{ matrix.lancedb }}
         build-args: |
           LANCEDB_VERSION=${{ matrix.lancedb }}
+          APP_VERSION=${{ steps.version.outputs.app_version }}
 
   test:
     runs-on: ubuntu-latest

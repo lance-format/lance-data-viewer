@@ -1,6 +1,6 @@
 [project]
 name = "lance-viewer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Read-only web viewer for Lance datasets"
 authors = [{name = "Lance Viewer", email = "noreply@example.com"}]
 license = {text = "MIT"}

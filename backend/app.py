@@ -18,16 +18,27 @@ from serialize_value import serialize_value
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _read_app_version() -> str:
+    here = Path(__file__).resolve().parent
+    for candidate in (here / "VERSION", here.parent / "VERSION"):
+        if candidate.exists():
+            return candidate.read_text().strip()
+    return "0.0.0-dev"
+
+
+APP_VERSION = _read_app_version()
+
 app = FastAPI(
     title="Lance Data Viewer",
     description="Read-only web viewer for Lance datasets",
-    version="0.1.0"
+    version=APP_VERSION,
 )
 
 @app.on_event("startup")
 async def startup_event():
     """Log version information on startup"""
-    logger.info(f"Lance Data Viewer v0.1.0")
+    logger.info(f"Lance Data Viewer v{APP_VERSION}")
     logger.info(f"LanceDB: {lancedb.__version__}, PyArrow: {pa.__version__}")
     logger.info(f"Data path: {DATA_PATH}")
 
@@ -145,11 +156,11 @@ async def health_check():
         }
 
         # Generate build tag
-        build_tag = f"app-0.1.0_lancedb-{lancedb_version}"
+        build_tag = f"app-{APP_VERSION}_lancedb-{lancedb_version}"
 
         return {
             "ok": True,
-            "app_version": "0.1.0",
+            "app_version": APP_VERSION,
             "lancedb_version": lancedb_version,
             "pyarrow_version": pyarrow_version,
             "build_tag": build_tag,
@@ -400,7 +411,7 @@ if __name__ == "__main__":
     import uvicorn
 
     # Log version information on startup
-    logger.info(f"Lance Data Viewer v0.1.0")
+    logger.info(f"Lance Data Viewer v{APP_VERSION}")
     logger.info(f"LanceDB: {lancedb.__version__}, PyArrow: {pa.__version__}")
     logger.info(f"Data path: {DATA_PATH}")
 
