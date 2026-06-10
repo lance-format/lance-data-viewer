@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- LanceDB 0.33.0 support with a matching container image tag. 0.33.0 is now the recommended version and carries the `latest`, `stable`, and `v{version}` tags (#53).
 - API endpoint test suite (pytest + FastAPI TestClient) covering all six endpoints, pagination, column filtering, value serialization, and corrupted-dataset handling. The CI test job now runs it against every supported Lance version (#28).
 
 ### Fixed

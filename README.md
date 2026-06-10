@@ -2,7 +2,7 @@
 
 Browse Lance tables from your local machine in a simple web UI. No database to set up. Mount a folder and go.
 
-Images are published for six LanceDB versions, so you can pick the one that matches your data format.
+Images are published for seven LanceDB versions, so you can pick the one that matches your data format.
 
 ![Lance Data Viewer Screenshot](lance_data_viewer_screenshot.png)
 
@@ -12,7 +12,7 @@ Images are published for six LanceDB versions, so you can pick the one that matc
 
 ```bash
 # Modern stable version (recommended for new projects)
-docker pull ghcr.io/lance-format/lance-data-viewer:lancedb-0.29.2
+docker pull ghcr.io/lance-format/lance-data-viewer:lancedb-0.33.0
 ```
 
 2. **Make your data readable (required)**
@@ -27,7 +27,7 @@ chmod -R o+rx /path/to/your/lance
 ```bash
 docker run --rm -p 8080:8080 \
     -v /path/to/your/lance:/data:ro \
-    ghcr.io/lance-format/lance-data-viewer:lancedb-0.29.2
+    ghcr.io/lance-format/lance-data-viewer:lancedb-0.33.0
 ```
 
 4. **Open the UI**
@@ -48,8 +48,9 @@ Choose the container that matches your Lance data format:
 
 | Container Tag | Lance Version | PyArrow | Use Case |
 |--------------|---------------|---------|----------|
-| `lancedb-0.29.2` | 0.29.2 | >=16, <22 | **Recommended** - Latest stable version |
-| `lancedb-0.24.3` | 0.24.3 | 21.0.0 | Modern stable version |
+| `lancedb-0.33.0` | 0.33.0 | >=16, <25 | **Recommended** - Latest stable version |
+| `lancedb-0.29.2` | 0.29.2 | >=16, <22 | Modern stable version |
+| `lancedb-0.24.3` | 0.24.3 | >=16, <22 | Modern stable version |
 | `lancedb-0.16.0` | 0.16.0 | 16.1.0 | Anchor stable for older datasets |
 | `lancedb-0.5` | 0.5.0 | 14.0.1 | Legacy support |
 | `lancedb-0.3.4` | 0.3.4 | 14.0.1 | Legacy support |
@@ -71,7 +72,7 @@ docker run --rm -p 8080:8080 \
     ghcr.io/lance-format/lance-data-viewer:lancedb-0.3.4
 ```
 
-**Tip**: If you're unsure which version to use, start with `lancedb-0.29.2` and if you get compatibility errors, try progressively older versions.
+**Tip**: If you're unsure which version to use, start with `lancedb-0.33.0` and if you get compatibility errors, try progressively older versions.
 
 ### Features
 
@@ -99,7 +100,7 @@ For pipelines or multi-container setups where lance-data-viewer shares a data vo
 ```yaml
 services:
   lance-viewer:
-    image: ghcr.io/lance-format/lance-data-viewer:lancedb-0.29.2
+    image: ghcr.io/lance-format/lance-data-viewer:lancedb-0.33.0
     environment:
       DATA_PATH: /data
     volumes:
@@ -116,7 +117,7 @@ All images are on the GitHub Container Registry: `ghcr.io/lance-format/lance-dat
 
 | Tag | Meaning |
 |-----|---------|
-| `lancedb-{version}` | Latest build for that Lance version (e.g. `lancedb-0.29.2`) |
+| `lancedb-{version}` | Latest build for that Lance version (e.g. `lancedb-0.33.0`) |
 | `latest` | Latest main-branch build of the recommended Lance version |
 | `stable` | Most recent tagged release, recommended Lance version |
 | `v{app version}` | Pin to an app release (e.g. `v0.2.0`) |
@@ -125,9 +126,9 @@ All images are on the GitHub Container Registry: `ghcr.io/lance-format/lance-dat
 ### Build and test locally
 
 ```bash
-# Build with specific Lance version (default: 0.29.2)
+# Build with specific Lance version (default: 0.33.0)
 docker build -f docker/Dockerfile \
-    --build-arg LANCEDB_VERSION=0.29.2 \
+    --build-arg LANCEDB_VERSION=0.33.0 \
     -t lance-data-viewer:dev .
 
 # Build multiple versions for testing
@@ -155,13 +156,13 @@ curl "http://localhost:8080/datasets/your-dataset/rows?limit=5"
 The API tests run without Docker. With Python 3.11:
 
 ```bash
-pip install -c backend/constraints-0.29.2.txt -r backend/requirements.txt
+pip install -c backend/constraints-0.33.0.txt -r backend/requirements.txt
 pip install pytest "httpx<0.28"
 cd backend && python -m pytest tests/ -v
 ```
 
 Swap the constraints file to test against a different Lance version. CI runs
-the suite against all six.
+the suite against every supported version.
 
 ### Development workflow
 
@@ -171,7 +172,7 @@ docker ps -q | xargs docker stop
 
 # Rebuild after code changes (with specific Lance version)
 docker build -f docker/Dockerfile \
-    --build-arg LANCEDB_VERSION=0.29.2 \
+    --build-arg LANCEDB_VERSION=0.33.0 \
     -t lance-data-viewer:dev .
 
 # Run in background
