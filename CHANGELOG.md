@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Frontend fetch calls now check `response.ok` before parsing JSON, so HTTP error responses surface as error states instead of being parsed as data (#27).
 - `/rows` with unknown column names and `/vector/preview` with a missing or non-vector column now return 400 as intended; the error was previously masked as a generic 500 (#28).
 
+### Docs
+- README refresh: corrected the supported-data-types section (variable-length float vectors render fully since #14; no 2048-dimension limit), documented the release image tags from #46, added test suite instructions, made 0.29.2 the recommendation throughout, and linked CONTRIBUTING.md and CHANGELOG.md (#51).
+
 ## [0.2.0] - 2026-04-16
 
 ### Added
