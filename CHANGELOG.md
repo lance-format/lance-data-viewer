@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+- README screenshot replaced with one showing vector columns: CLIP badges, per-row sparklines, and the highlighted vector field in the schema panel. The old screenshot only showed scalar columns.
+
 ## [0.3.0] - 2026-06-10
 
 ### Added
