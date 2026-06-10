@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Frontend fetch calls now check `response.ok` before parsing JSON, so HTTP error responses surface as error states instead of being parsed as data (#27).
+
 ## [0.2.0] - 2026-04-16
 
 ### Added

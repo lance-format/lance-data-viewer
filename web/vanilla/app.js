@@ -69,6 +69,9 @@ class LanceViewer {
     async checkHealth() {
         try {
             const response = await fetch(`${this.apiBase}/healthz`);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
             const data = await response.json();
             if (data.ok) {
                 // Show Lance version prominently along with app version
@@ -93,6 +96,9 @@ class LanceViewer {
     async loadDatasets() {
         try {
             const response = await fetch(`${this.apiBase}/datasets`);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
             const data = await response.json();
 
             this.elements.datasetList.innerHTML = '';
@@ -134,6 +140,9 @@ class LanceViewer {
     async loadSchema() {
         try {
             const response = await fetch(`${this.apiBase}/datasets/${this.currentDataset}/schema`);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
             const schema = await response.json();
 
             this.elements.schemaDisplay.innerHTML = '';
@@ -167,6 +176,9 @@ class LanceViewer {
     async loadColumns() {
         try {
             const response = await fetch(`${this.apiBase}/datasets/${this.currentDataset}/columns`);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
             const data = await response.json();
 
             this.allColumns = data.columns;
@@ -225,6 +237,9 @@ class LanceViewer {
             }
 
             const response = await fetch(`${this.apiBase}/datasets/${this.currentDataset}/rows?${params}`);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
             const data = await response.json();
 
             this.totalRows = data.total;
