@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- API endpoint test suite (pytest + FastAPI TestClient) covering all six endpoints, pagination, column filtering, value serialization, and corrupted-dataset handling. The CI test job now runs it against every supported Lance version (#28).
+
 ### Fixed
 - Frontend fetch calls now check `response.ok` before parsing JSON, so HTTP error responses surface as error states instead of being parsed as data (#27).
+- `/rows` with unknown column names and `/vector/preview` with a missing or non-vector column now return 400 as intended; the error was previously masked as a generic 500 (#28).
 
 ## [0.2.0] - 2026-04-16
 

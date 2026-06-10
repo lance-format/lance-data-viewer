@@ -89,63 +89,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -c backend/constraints-${{ matrix.lancedb }}.txt \
           -r backend/requirements.txt
-        pip install httpx  # Required for TestClient
+        # httpx is required by TestClient; <0.28 keeps the app= kwarg
+        # that the starlette version pinned by fastapi 0.104 still uses
+        pip install pytest "httpx<0.28"
 
-    - name: Debug dependency versions
+    - name: Run API endpoint tests
       run: |
         cd backend
-        python -c "
-        import lancedb
-        import pyarrow
-        import fastapi
-        import starlette
-        from fastapi.testclient import TestClient
-        import inspect
-
-        print(f'=== Lance {lancedb.__version__} Dependencies ===')
-        print(f'LanceDB: {lancedb.__version__}')
-        print(f'PyArrow: {pyarrow.__version__}')
-        print(f'FastAPI: {fastapi.__version__}')
-        print(f'Starlette: {starlette.__version__}')
-
-        print(f'\\n=== TestClient signature ===')
-        sig = inspect.signature(TestClient.__init__)
-        print(f'TestClient.__init__{sig}')
-
-        print(f'\\n=== App module structure ===')
-        import app
-        print(f'app module type: {type(app)}')
-        if hasattr(app, 'app'):
-            print(f'app.app type: {type(app.app)}')
-            print(f'app.app class: {app.app.__class__.__name__}')
-        else:
-            print('No app.app attribute found')
-        "
-
-    - name: Test API endpoints
-      run: |
-        cd backend
-        python -c "
-        import app
-        import lancedb
-        import pyarrow
-        from fastapi.testclient import TestClient
-
-        # Print version information first
-        print(f'Testing with LanceDB {lancedb.__version__}, PyArrow {pyarrow.__version__}')
-
-        # Test health endpoint only - skip TestClient for now
-        # response = client.get('/healthz')
-        # assert response.status_code == 200
-        # assert response.json()['ok'] == True
-        print('✓ Health check skipped (debugging TestClient)')
-
-        # Test datasets endpoint (will fail without data but should not crash)
-        # try:
-        #     response = client.get('/datasets')
-        #     print('✓ Datasets endpoint accessible')
-        # except Exception as e:
-        #     print(f'✓ Datasets endpoint handled error gracefully: {e}')
-
-        print('✓ Debug completed - TestClient investigation needed')
-        "
+        python -m pytest tests/ -v

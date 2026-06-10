@@ -341,6 +341,8 @@ async def get_dataset_rows(
             "offset": offset
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting rows for {dataset_name}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get dataset rows")
@@ -392,6 +394,8 @@ async def get_vector_preview(
 
         return {"stats": stats, "preview": preview}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting vector preview for {dataset_name}.{column}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get vector preview")
