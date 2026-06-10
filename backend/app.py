@@ -174,7 +174,12 @@ async def health_check():
 async def list_datasets():
     try:
         db = get_lance_connection()
-        table_names = db.table_names()
+        if hasattr(db, "list_tables"):
+            table_names = db.list_tables().tables
+        else:
+            # table_names() was deprecated in favor of list_tables(),
+            # but older lancedb versions only have table_names()
+            table_names = db.table_names()
         valid_tables = [name for name in table_names if validate_dataset_name(name)]
         return {"datasets": valid_tables}
     except Exception as e:
