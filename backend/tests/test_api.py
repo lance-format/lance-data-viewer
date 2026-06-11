@@ -128,7 +128,8 @@ def test_rows_offset_past_end(client):
 
 def test_rows_limit_bounds(client):
     assert client.get("/datasets/sample/rows", params={"limit": 0}).status_code == 422
-    assert client.get("/datasets/sample/rows", params={"limit": 201}).status_code == 422
+    assert client.get("/datasets/sample/rows", params={"limit": 1000}).status_code == 200
+    assert client.get("/datasets/sample/rows", params={"limit": 1001}).status_code == 422
     assert client.get("/datasets/sample/rows", params={"offset": -1}).status_code == 422
 
 

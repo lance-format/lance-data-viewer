@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Maximum rows per page raised from 200 to 1000. The page-size dropdown gains 500 and 1000 options; the default stays at 50 (#58).
+
 ### Docs
 - README screenshot replaced with one showing vector columns: CLIP badges, per-row sparklines, and the highlighted vector field in the schema panel. The old screenshot only showed scalar columns.
 

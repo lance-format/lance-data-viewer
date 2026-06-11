@@ -51,7 +51,7 @@ app.add_middleware(
 )
 
 DATA_PATH = Path(os.getenv("DATA_PATH", "/data"))
-MAX_LIMIT = 200
+MAX_LIMIT = 1000
 
 def validate_dataset_name(name: str) -> bool:
     return (
