@@ -56,6 +56,72 @@ jobs:
           type=raw,value=latest,enable=${{ matrix.lancedb == '0.33.0' && github.ref == 'refs/heads/main' }}
           type=raw,value=stable,enable=${{ matrix.lancedb == '0.33.0' && startsWith(github.ref, 'refs/tags/') }}
 
+    # Build the amd64 image and run it before anything is published. The test
+    # job only exercises the source tree, so this is the first thing that
+    # proves the image itself works. load: true accepts one platform only, so
+    # the multi-platform build below reuses these layers from the cache.
+    - name: Build image for the smoke test
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        load: true
+        platforms: linux/amd64
+        tags: smoke:${{ matrix.lancedb }}
+        cache-from: type=gha,scope=lancedb-${{ matrix.lancedb }}
+        build-args: |
+          LANCEDB_VERSION=${{ matrix.lancedb }}
+          APP_VERSION=${{ steps.version.outputs.app_version }}
+
+    - name: Smoke test the image
+      run: |
+        set -euo pipefail
+
+        cleanup() {
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "--- container logs ---"
+            docker logs smoke 2>&1 || true
+          fi
+          docker rm -f smoke >/dev/null 2>&1 || true
+          exit $status
+        }
+        trap cleanup EXIT
+
+        # entrypoint.sh only needs DATA_PATH to exist and to be readable.
+        # Docker picks the host port, so the runner needs no free port of ours.
+        mkdir -p /tmp/smoke-data
+        docker run -d --name smoke -p 127.0.0.1::8080 \
+          -v /tmp/smoke-data:/data:ro \
+          smoke:${{ matrix.lancedb }}
+
+        url="http://$(docker port smoke 8080 | head -1)"
+        echo "container is on ${url}"
+
+        for _ in $(seq 30); do
+          if curl -fsS "${url}/healthz" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 1
+        done
+
+        echo "--- /healthz ---"
+        curl -fsS "${url}/healthz" | tee /tmp/healthz.json
+        echo
+        grep -q '"ok":true' /tmp/healthz.json
+
+        echo "--- /datasets ---"
+        curl -fsS "${url}/datasets" | grep -q '"datasets"'
+
+        # The static files live at /web in the image. app.py mounts them only
+        # when that directory exists, so a wrong COPY path serves no frontend
+        # while every API endpoint still answers.
+        echo "--- static files ---"
+        curl -fsS -o /dev/null "${url}/"
+        curl -fsS -o /dev/null "${url}/app.js"
+
+        echo "smoke test passed for lancedb ${{ matrix.lancedb }}"
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v7
       with:
