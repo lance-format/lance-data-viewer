@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- CI smoke test. Each build starts the image it just built and checks `/healthz`, `/datasets`, and the static files, before the image is published (#67).
+
+### Changed
+- GitHub Actions pinned to the majors that run on Node 24, before Node 20 leaves the runners (#60).
+
+### Fixed
+- `docker build` no longer fails with "the destination must be a directory and end with a /". `COPY backend/*.py .` needs a trailing slash when it copies more than one file. The classic builder rejected it, the BuildKit builder did not (#62).
+- CI publishes no image until the test job passes. The build job now depends on the test job, so a failing test stops the release (#66).
+
 ## [0.3.1] - 2026-06-11
 
 ### Changed
