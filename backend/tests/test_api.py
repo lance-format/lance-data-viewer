@@ -1,4 +1,4 @@
-"""API endpoint tests, based on docs/spec.md.
+"""API endpoint tests.
 
 Covers /healthz, /datasets, /metadata, /schema, /columns, /rows (pagination,
 column filtering, serialization), /vector/preview, and the
