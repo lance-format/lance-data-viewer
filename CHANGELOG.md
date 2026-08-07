@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Dataset locations can be selected in the UI when `DATA_PATH` is unset. Tables can be opened at main, a numeric version, or a tag.
 - CI smoke test. Each build starts the image it just built and checks `/healthz`, `/datasets`, and the static files, before the image is published (#67).
 
 ### Changed

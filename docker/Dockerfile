@@ -33,7 +33,6 @@ RUN chmod -R 755 /web
 USER appuser
 
 ENV PATH=/home/appuser/.local/bin:$PATH
-ENV DATA_PATH=/data
 ENV PORT=8080
 
 EXPOSE 8080

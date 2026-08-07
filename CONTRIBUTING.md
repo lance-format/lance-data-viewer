@@ -97,7 +97,7 @@ docker build -f docker/Dockerfile \
     -t lance-data-viewer:dev .
 
 # Run with your data
-docker run --rm -p 8080:8080 -v $(pwd)/data:/data:ro lance-data-viewer:dev
+docker run --rm -p 8080:8080 -e DATA_PATH=/data -v $(pwd)/data:/data:ro lance-data-viewer:dev
 
 # Open the UI
 open http://localhost:8080

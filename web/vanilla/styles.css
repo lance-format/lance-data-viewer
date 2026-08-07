@@ -69,6 +69,71 @@ header h1 {
     font-weight: 500;
 }
 
+.connection-panel {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 15px;
+    padding: 16px 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex-wrap: wrap;
+}
+
+.connection-field {
+    display: flex;
+    flex: 1 1 300px;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.connection-field label {
+    color: #2c3e50;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.connection-field input {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.connection-field input:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.15);
+    outline: none;
+}
+
+.connection-field small {
+    color: #6c757d;
+    font-size: 0.72rem;
+}
+
+.connection-panel button {
+    margin-top: 23px;
+    padding: 9px 20px;
+    border: 1px solid #2980b9;
+    border-radius: 4px;
+    background: #3498db;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.connection-panel button:hover {
+    background: #2980b9;
+}
+
+.connection-error {
+    flex-basis: 100%;
+    color: #721c24;
+    font-size: 0.85rem;
+}
+
 .main-content {
     display: grid;
     grid-template-columns: 320px 1fr;
@@ -382,6 +447,14 @@ table tr:hover {
 }
 
 @media (max-width: 1024px) {
+    .connection-panel {
+        align-items: stretch;
+    }
+
+    .connection-panel button {
+        margin-top: 0;
+    }
+
     .main-content {
         grid-template-columns: 1fr;
     }

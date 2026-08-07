@@ -7,11 +7,14 @@ class LanceViewer {
         this.selectedColumns = [];
         this.allColumns = [];
         this.apiBase = window.location.origin;
+        this.dataPathConfigured = false;
+        this.currentDataLocation = '';
+        this.currentReference = 'main';
 
         this.initializeElements();
         this.setupEventListeners();
         this.checkHealth();
-        this.loadDatasets();
+        this.initializeConnection();
     }
 
     initializeElements() {
@@ -38,7 +41,12 @@ class LanceViewer {
             selectNoneCols: document.getElementById('selectNoneCols'),
             applyColumns: document.getElementById('applyColumns'),
             tooltip: document.getElementById('tooltip'),
-            toggleWordWrap: document.getElementById('toggleWordWrap')
+            toggleWordWrap: document.getElementById('toggleWordWrap'),
+            dataLocationField: document.getElementById('dataLocationField'),
+            dataLocation: document.getElementById('dataLocation'),
+            datasetReference: document.getElementById('datasetReference'),
+            openDatasetLocation: document.getElementById('openDatasetLocation'),
+            connectionError: document.getElementById('connectionError')
         };
     }
 
@@ -54,6 +62,12 @@ class LanceViewer {
         this.elements.selectAllCols.addEventListener('click', () => this.selectAllColumns());
         this.elements.selectNoneCols.addEventListener('click', () => this.selectNoColumns());
         this.elements.applyColumns.addEventListener('click', () => this.applyColumnSelection());
+        this.elements.openDatasetLocation.addEventListener('click', () => this.applyConnection());
+        [this.elements.dataLocation, this.elements.datasetReference].forEach(input => {
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') this.applyConnection();
+            });
+        });
 
         document.addEventListener('mousemove', (e) => this.updateTooltipPosition(e));
 
@@ -64,6 +78,71 @@ class LanceViewer {
                 this.elements.dataTable.classList.remove('wrap-text');
             }
         });
+    }
+
+    async initializeConnection() {
+        try {
+            const response = await fetch(`${this.apiBase}/config`);
+            if (!response.ok) throw new Error('Failed to load configuration');
+            const config = await response.json();
+            this.dataPathConfigured = config.data_path_configured;
+            this.currentReference = config.default_reference || 'main';
+            this.elements.datasetReference.value = this.currentReference;
+
+            if (this.dataPathConfigured) {
+                this.elements.dataLocationField.style.display = 'none';
+                await this.loadDatasets();
+            } else {
+                this.elements.datasetList.innerHTML =
+                    '<div class="loading">Enter a Lance dataset location above.</div>';
+                this.elements.dataLocation.focus();
+            }
+        } catch (error) {
+            this.showConnectionError(error.message);
+        }
+    }
+
+    async applyConnection() {
+        const dataLocation = this.elements.dataLocation.value.trim();
+        if (!this.dataPathConfigured && !dataLocation) {
+            this.showConnectionError('Lance dataset location is required.');
+            this.elements.dataLocation.focus();
+            return;
+        }
+
+        this.currentDataLocation = dataLocation;
+        this.currentReference = this.elements.datasetReference.value.trim() || 'main';
+        this.elements.datasetReference.value = this.currentReference;
+        this.elements.connectionError.textContent = '';
+        this.currentDataset = null;
+        this.elements.datasetHeader.style.display = 'none';
+        this.elements.columnSection.style.display = 'none';
+        this.elements.schemaSection.style.display = 'none';
+        await this.loadDatasets();
+    }
+
+    contextParams(includeReference = true) {
+        const params = new URLSearchParams();
+        if (!this.dataPathConfigured && this.currentDataLocation) {
+            params.set('data_location', this.currentDataLocation);
+        }
+        if (includeReference) {
+            params.set('reference', this.currentReference);
+        }
+        return params;
+    }
+
+    async responseError(response) {
+        try {
+            const body = await response.json();
+            return body.detail || `API error: ${response.status} ${response.statusText}`;
+        } catch (_error) {
+            return `API error: ${response.status} ${response.statusText}`;
+        }
+    }
+
+    showConnectionError(message) {
+        this.elements.connectionError.textContent = message;
     }
 
     async checkHealth() {
@@ -95,9 +174,12 @@ class LanceViewer {
 
     async loadDatasets() {
         try {
-            const response = await fetch(`${this.apiBase}/datasets`);
+            this.elements.datasetList.innerHTML = '<div class="loading">Loading datasets...</div>';
+            const params = this.contextParams(false);
+            const suffix = params.toString() ? `?${params}` : '';
+            const response = await fetch(`${this.apiBase}/datasets${suffix}`);
             if (!response.ok) {
-                throw new Error(`API error: ${response.status} ${response.statusText}`);
+                throw new Error(await this.responseError(response));
             }
             const data = await response.json();
 
@@ -112,20 +194,21 @@ class LanceViewer {
                 const item = document.createElement('div');
                 item.className = 'dataset-item';
                 item.textContent = dataset;
-                item.addEventListener('click', () => this.selectDataset(dataset));
+                item.addEventListener('click', () => this.selectDataset(dataset, item));
                 this.elements.datasetList.appendChild(item);
             });
         } catch (error) {
             this.elements.datasetList.innerHTML = '<div class="error">Failed to load datasets</div>';
+            this.showConnectionError(error.message);
         }
     }
 
-    async selectDataset(datasetName) {
+    async selectDataset(datasetName, selectedItem) {
         document.querySelectorAll('.dataset-item').forEach(item => {
             item.classList.remove('active');
         });
 
-        event.target.classList.add('active');
+        selectedItem.classList.add('active');
 
         this.currentDataset = datasetName;
         this.currentPage = 0;
@@ -133,6 +216,7 @@ class LanceViewer {
         this.selectedColumns = [];
         this.elements.datasetTitle.textContent = datasetName;
         this.elements.datasetHeader.style.display = 'block';
+        this.elements.connectionError.textContent = '';
 
         await Promise.all([
             this.loadMetadata(),
@@ -142,16 +226,20 @@ class LanceViewer {
 
     async loadMetadata() {
         try {
-            const response = await fetch(`${this.apiBase}/datasets/${this.currentDataset}/metadata`);
+            const params = this.contextParams();
+            const response = await fetch(
+                `${this.apiBase}/datasets/${encodeURIComponent(this.currentDataset)}/metadata?${params}`
+            );
             if (!response.ok) {
-                throw new Error(`API error: ${response.status} ${response.statusText}`);
+                throw new Error(await this.responseError(response));
             }
             const metadata = await response.json();
             this.renderSchema(metadata.fields);
             this.renderColumns(metadata.columns);
             return true;
         } catch (error) {
-            this.showError('Failed to load metadata');
+            this.showConnectionError(error.message);
+            this.showError(error.message);
             return false;
         }
     }
@@ -230,14 +318,18 @@ class LanceViewer {
                 limit: this.pageSize.toString(),
                 offset: (this.currentPage * this.pageSize).toString()
             });
+            const context = this.contextParams();
+            context.forEach((value, key) => params.set(key, value));
 
             if (this.selectedColumns.length > 0 && this.selectedColumns.length < this.allColumns.length) {
                 params.append('columns', this.selectedColumns.join(','));
             }
 
-            const response = await fetch(`${this.apiBase}/datasets/${this.currentDataset}/rows?${params}`);
+            const response = await fetch(
+                `${this.apiBase}/datasets/${encodeURIComponent(this.currentDataset)}/rows?${params}`
+            );
             if (!response.ok) {
-                throw new Error(`API error: ${response.status} ${response.statusText}`);
+                throw new Error(await this.responseError(response));
             }
             const data = await response.json();
 
@@ -249,7 +341,8 @@ class LanceViewer {
 
         } catch (error) {
             this.hideLoading();
-            this.showError('Failed to load data');
+            this.showConnectionError(error.message);
+            this.showError(error.message);
             return false;
         }
     }

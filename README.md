@@ -26,9 +26,14 @@ chmod -R o+rx /path/to/your/lance
 
 ```bash
 docker run --rm -p 8080:8080 \
+    -e DATA_PATH=/data \
     -v /path/to/your/lance:/data:ro \
     ghcr.io/lance-format/lance-data-viewer:lancedb-0.36.0
 ```
+
+Alternatively, omit `DATA_PATH`/the `/data` mount and enter a database
+location in the web UI. The location can be a local path available to the
+viewer process or an object-store URI supported by LanceDB.
 
 4. **Open the UI**
 
@@ -64,11 +69,13 @@ If you have datasets created with older Lance versions:
 ```bash
 # For datasets created with Lance 0.16.x
 docker run --rm -p 8080:8080 \
+    -e DATA_PATH=/data \
     -v /path/to/your/old/lance/data:/data:ro \
     ghcr.io/lance-format/lance-data-viewer:lancedb-0.16.0
 
 # For very old datasets (Lance 0.3.x era)
 docker run --rm -p 8080:8080 \
+    -e DATA_PATH=/data \
     -v /path/to/your/legacy/data:/data:ro \
     ghcr.io/lance-format/lance-data-viewer:lancedb-0.3.4
 ```
@@ -78,6 +85,7 @@ docker run --rm -p 8080:8080 \
 ### Features
 
 - **Read-only browsing** with organized left sidebar (Datasets → Columns → Schema)
+- **Version browsing** for main, numeric versions, and tags
 - **Advanced vector visualization** with CLIP embedding detection and sparkline charts
 - **Schema analysis** with vector column highlighting and type detection
 - **Server-side pagination** with inline controls and column filtering
@@ -88,11 +96,18 @@ docker run --rm -p 8080:8080 \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATA_PATH` | `/data` | Directory containing Lance tables |
+| `DATA_PATH` | unset | Directory containing Lance tables; the UI asks when unset |
 | `PORT` | `8080` | Port the server listens on |
 
 - **Port:** change host port with `-p 9000:8080`, or set `PORT` env var to change the container's listening port.
 - **Read-only mount:** keep `:ro` to avoid accidental writes in future versions.
+
+When `DATA_PATH` is not set, the UI requires a Lance database location before
+loading tables. The reference field accepts:
+
+- `main` for the latest snapshot on the main branch (default)
+- `42` for version 42 on main
+- `tag:release` for a tag
 
 ### Docker Compose
 
@@ -141,7 +156,7 @@ docker build -f docker/Dockerfile --build-arg LANCEDB_VERSION=0.3.4 -t lance-dat
 chmod -R o+rx data
 
 # Run with your data (replace 'data' with your lance folder path)
-docker run --rm -p 8080:8080 -v $(pwd)/data:/data:ro lance-data-viewer:dev
+docker run --rm -p 8080:8080 -e DATA_PATH=/data -v $(pwd)/data:/data:ro lance-data-viewer:dev
 
 # Open the web interface
 open http://localhost:8080
@@ -177,7 +192,7 @@ docker build -f docker/Dockerfile \
     -t lance-data-viewer:dev .
 
 # Run in background
-docker run --rm -d -p 8080:8080 -v $(pwd)/data:/data:ro lance-data-viewer:dev
+docker run --rm -d -p 8080:8080 -e DATA_PATH=/data -v $(pwd)/data:/data:ro lance-data-viewer:dev
 
 # View logs
 docker logs $(docker ps -q --filter ancestor=lance-data-viewer:dev)
@@ -218,6 +233,7 @@ The viewer provides advanced visualization for vector embeddings:
 - Container runs as non-root
 - No authentication; bind to localhost during development and run behind a reverse proxy if exposing
 - Read-only access prevents accidental data modification
+- Without `DATA_PATH`, the UI can request locations accessible to the server; do not expose that mode to untrusted users
 
 ### Contributing
 
