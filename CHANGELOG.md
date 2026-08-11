@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FastAPI startup logging moved from the deprecated `on_event` decorator to a lifespan context manager (#77).
 - Dataset loading now fetches combined schema and column metadata in parallel with row data, reducing four sequential I/O operations to two concurrent requests (#75).
 - FastAPI raised from 0.104.1 to 0.141.1, and the test suite moved from httpx to httpx2. The old FastAPI brought starlette 0.27, which passed an argument that httpx had deprecated, so the test instructions had to hold httpx below 0.28. Test runs are now free of deprecation warnings (#81).
+- LanceDB 0.36.0 and PyArrow 25 are now supported and recommended. The `latest`, `stable`, and app-version container tags now use this dependency set.
+- Uvicorn raised from 0.24.0 to 0.52.1 and python-multipart from 0.0.6 to 0.0.32.
+- Python package builds now require setuptools 83 or newer and wheel 0.47 or newer.
 
 ### Fixed
 - `docker build` no longer fails with "the destination must be a directory and end with a /". `COPY backend/*.py .` needs a trailing slash when it copies more than one file. The classic builder rejected it, the BuildKit builder did not (#62).

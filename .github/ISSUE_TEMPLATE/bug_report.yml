@@ -15,7 +15,9 @@ body:
       label: Container tag
       description: Which Lance Data Viewer container are you running?
       options:
-        - "lancedb-0.29.2 (recommended)"
+        - "lancedb-0.36.0 (recommended)"
+        - "lancedb-0.33.0"
+        - "lancedb-0.29.2"
         - "lancedb-0.24.3"
         - "lancedb-0.16.0"
         - "lancedb-0.5"

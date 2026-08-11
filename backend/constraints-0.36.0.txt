@@ -1,0 +1,4 @@
+# Constraints for lancedb 0.36.0
+lancedb==0.36.0
+numpy>=2,<3
+pyarrow>=25,<26

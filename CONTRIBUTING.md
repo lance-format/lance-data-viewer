@@ -91,9 +91,9 @@ for new contributors:
 ## Development Workflow
 
 ```bash
-# Build with a specific Lance version (default: 0.29.2)
+# Build with a specific Lance version (default: 0.36.0)
 docker build -f docker/Dockerfile \
-    --build-arg LANCEDB_VERSION=0.29.2 \
+    --build-arg LANCEDB_VERSION=0.36.0 \
     -t lance-data-viewer:dev .
 
 # Run with your data
