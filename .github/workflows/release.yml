@@ -88,11 +88,10 @@ jobs:
         }
         trap cleanup EXIT
 
-        # Exercise the preconfigured-path mode against the mounted data directory.
+        # entrypoint.sh only needs DATA_PATH to exist and to be readable.
         # Docker picks the host port, so the runner needs no free port of ours.
         mkdir -p /tmp/smoke-data
         docker run -d --name smoke -p 127.0.0.1::8080 \
-          -e DATA_PATH=/data \
           -v /tmp/smoke-data:/data:ro \
           smoke:${{ matrix.lancedb }}
 
