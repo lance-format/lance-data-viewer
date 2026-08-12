@@ -7,6 +7,7 @@ graceful-degradation path for unreadable datasets.
 
 import base64
 import inspect
+from pathlib import Path
 from types import SimpleNamespace
 
 import lancedb
@@ -62,6 +63,37 @@ def test_query_dataset_location_used_without_environment(client, monkeypatch, da
     response = client.get("/datasets", params={"data_location": str(data_dir)})
     assert response.status_code == 200
     assert "sample" in response.json()["datasets"]
+
+
+def test_missing_location_is_rejected_and_not_created(client, monkeypatch, tmp_path):
+    import app as app_module
+
+    missing = tmp_path / "not-a-database"
+    monkeypatch.setattr(app_module, "DATA_PATH", None)
+    response = client.get("/datasets", params={"data_location": str(missing)})
+
+    assert response.status_code == 400
+    assert "not found" in response.json()["detail"]
+    assert not missing.exists()
+
+
+def test_missing_configured_data_path_is_a_server_error(client, monkeypatch, tmp_path):
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "DATA_PATH", tmp_path / "gone")
+    response = client.get("/datasets")
+
+    assert response.status_code == 500
+    assert not (tmp_path / "gone").exists()
+
+
+def test_remote_locations_skip_the_local_path_check():
+    import app as app_module
+
+    assert app_module.local_database_path("s3://bucket/tables") is None
+    assert app_module.local_database_path("gs://bucket/tables") is None
+    assert app_module.local_database_path("/srv/lance") == Path("/srv/lance")
+    assert app_module.local_database_path("file:///srv/lance") == Path("/srv/lance")
 
 
 def test_open_table_reference_forms(client):

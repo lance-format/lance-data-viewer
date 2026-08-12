@@ -5,6 +5,7 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+from urllib.parse import urlparse
 import json
 
 import lancedb
@@ -69,15 +70,40 @@ def validate_dataset_name(name: str) -> bool:
         and len(name) <= 100
     )
 
+def local_database_path(location: str) -> Optional[Path]:
+    """Return the filesystem path for a local location, or None if it is remote.
+
+    Object store URIs such as s3:// are opened by LanceDB without touching the
+    local filesystem, so only plain paths and file: URIs are local.
+    """
+    scheme = urlparse(location).scheme
+    if scheme and scheme != "file" and len(scheme) > 1:
+        return None
+    if location.startswith("file://"):
+        return Path(location[7:])
+    if location.startswith("file:"):
+        return Path(location[5:])
+    return Path(location)
+
+
 def get_lance_connection(data_location: Optional[str] = None):
     """Connect to the configured database, or a location supplied by the UI."""
-    location = str(DATA_PATH).strip() if DATA_PATH is not None else ""
-    if not location:
-        location = (data_location or "").strip()
+    configured = str(DATA_PATH).strip() if DATA_PATH is not None else ""
+    location = configured or (data_location or "").strip()
     if not location:
         raise HTTPException(
             status_code=400,
             detail="A Lance dataset location is required when DATA_PATH is not set",
+        )
+    # lancedb.connect() creates a local directory that does not exist. The
+    # viewer never writes to Lance data, so refuse instead of creating one.
+    path = local_database_path(location)
+    if path is not None and not path.expanduser().is_dir():
+        if configured:
+            raise HTTPException(status_code=500, detail="Data path not found")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lance database location not found: {location}",
         )
     return lancedb.connect(location)
 
