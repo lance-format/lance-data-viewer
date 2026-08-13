@@ -38,6 +38,20 @@ def _is_id3(raw: bytes) -> bool:
     return all(byte < 0x80 for byte in raw[6:10])
 
 
+def _is_ftyp(raw: bytes) -> bool:
+    """Check the ISO base media magic and the box size in front of it.
+
+    "ftyp" starts four bytes into the file, so binary that holds those
+    characters at that offset would otherwise be read as video. A real box
+    is at least 16 bytes and holds a whole number of 4-byte fields, so the
+    size tells the two apart.
+    """
+    if len(raw) < 16 or raw[4:8] != b"ftyp":
+        return False
+    box_size = int.from_bytes(raw[0:4], "big")
+    return 16 <= box_size <= len(raw) and box_size % 4 == 0
+
+
 def detect_media_type(raw: bytes):
     """Return (media category, MIME type) from common file signatures."""
     if raw.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -64,12 +78,10 @@ def detect_media_type(raw: bytes):
         return "audio", "audio/flac"
     if raw.startswith(b"OggS"):
         return "audio", "audio/ogg"
-    if _is_id3(raw) or (
-        len(raw) >= 128 and raw[0] == 0xFF and raw[1] & 0xE0 == 0xE0
-    ):
+    if _is_id3(raw):
         return "audio", "audio/mpeg"
 
-    if len(raw) >= 12 and raw[4:8] == b"ftyp":
+    if _is_ftyp(raw):
         brands = raw[8:32]
         if any(brand in brands for brand in (b"avif", b"avis")):
             return "image", "image/avif"
