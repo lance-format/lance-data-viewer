@@ -5,6 +5,7 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+from urllib.parse import urlparse
 import json
 
 import lancedb
@@ -55,8 +56,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATA_PATH = Path(os.getenv("DATA_PATH", "/data"))
+DATA_PATH = os.getenv("DATA_PATH")
 MAX_LIMIT = 1000
+
+
+class InvalidDatasetReference(ValueError):
+    """Raised when a requested branch, tag, or version cannot be opened."""
 
 def validate_dataset_name(name: str) -> bool:
     return (
@@ -65,10 +70,144 @@ def validate_dataset_name(name: str) -> bool:
         and len(name) <= 100
     )
 
-def get_lance_connection():
-    if not DATA_PATH.exists():
-        raise HTTPException(status_code=500, detail="Data path not found")
-    return lancedb.connect(str(DATA_PATH))
+def local_database_path(location: str) -> Optional[Path]:
+    """Return the filesystem path for a local location, or None if it is remote.
+
+    Object store URIs such as s3:// are opened by LanceDB without touching the
+    local filesystem, so only plain paths and file: URIs are local.
+    """
+    scheme = urlparse(location).scheme
+    if scheme and scheme != "file" and len(scheme) > 1:
+        return None
+    if location.startswith("file://"):
+        return Path(location[7:])
+    if location.startswith("file:"):
+        return Path(location[5:])
+    return Path(location)
+
+
+def get_lance_connection(data_location: Optional[str] = None):
+    """Connect to the configured database, or a location supplied by the UI."""
+    configured = str(DATA_PATH).strip() if DATA_PATH is not None else ""
+    location = configured or (data_location or "").strip()
+    if not location:
+        raise HTTPException(
+            status_code=400,
+            detail="A Lance dataset location is required when DATA_PATH is not set",
+        )
+    # lancedb.connect() creates a local directory that does not exist. The
+    # viewer never writes to Lance data, so refuse instead of creating one.
+    path = local_database_path(location)
+    if path is not None and not path.expanduser().is_dir():
+        if configured:
+            raise HTTPException(status_code=500, detail="Data path not found")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lance database location not found: {location}",
+        )
+    return lancedb.connect(location)
+
+
+def _checkout(table, reference):
+    """Checkout a tag/version while retaining support for older LanceDB clients."""
+    checkout = getattr(table, "checkout", None)
+    if checkout is None:
+        raise InvalidDatasetReference(
+            "This LanceDB version does not support tag or version checkout"
+        )
+    checkout(reference)
+    return table
+
+
+def open_table_at_reference(db, dataset_name: str, reference: str = "main"):
+    """Open a table at main/latest, a version, tag, or branch reference.
+
+    Accepted forms are ``main``, ``42``, ``tag:release``,
+    ``branch:experiment``, and ``branch:experiment@42``. A bare name is
+    accepted as a convenience and resolves as a branch first, then as a tag.
+    """
+    value = (reference or "main").strip()
+    if not value or value in {"main", "latest"}:
+        return db.open_table(dataset_name)
+
+    if value.isdigit():
+        version = int(value)
+        try:
+            return db.open_table(dataset_name, version=version)
+        except TypeError:
+            return _checkout(db.open_table(dataset_name), version)
+        except Exception as error:
+            raise InvalidDatasetReference(
+                f"Unable to open main at version {version}: {error}"
+            ) from error
+
+    if value.startswith("tag:"):
+        tag = value.removeprefix("tag:").strip()
+        if not tag:
+            raise InvalidDatasetReference("Tag name cannot be empty")
+        try:
+            return _checkout(db.open_table(dataset_name), tag)
+        except InvalidDatasetReference:
+            raise
+        except Exception as error:
+            raise InvalidDatasetReference(f"Unable to open tag '{tag}': {error}") from error
+
+    explicit_branch = value.startswith("branch:")
+    branch_reference = value.removeprefix("branch:").strip() if explicit_branch else value
+    branch, separator, version_text = branch_reference.rpartition("@")
+    if not separator:
+        branch = branch_reference
+        version = None
+    else:
+        if not branch or not version_text.isdigit():
+            raise InvalidDatasetReference(
+                "Branch versions must use branch:name@<number>"
+            )
+        version = int(version_text)
+
+    try:
+        kwargs = {"branch": branch}
+        if version is not None:
+            kwargs["version"] = version
+        return db.open_table(dataset_name, **kwargs)
+    except Exception as branch_error:
+        branch_unsupported = (
+            isinstance(branch_error, TypeError)
+            and "branch" in str(branch_error)
+        )
+        if explicit_branch or version is not None:
+            if branch_unsupported:
+                raise InvalidDatasetReference(
+                    f"Branch selection is not supported by LanceDB {lancedb.__version__}"
+                ) from branch_error
+            raise InvalidDatasetReference(
+                f"Unable to open branch '{branch_reference}': {branch_error}"
+            ) from branch_error
+
+        # A bare name may be either a branch or a tag. Branches take priority.
+        try:
+            return _checkout(db.open_table(dataset_name), value)
+        except Exception as tag_error:
+            if branch_unsupported:
+                raise InvalidDatasetReference(
+                    f"No tag named '{value}' was found, and branch selection is "
+                    f"not supported by LanceDB {lancedb.__version__}"
+                ) from tag_error
+            raise InvalidDatasetReference(
+                f"Unable to open branch or tag '{value}': {tag_error}"
+            ) from branch_error
+
+
+def get_dataset_table(
+    dataset_name: str,
+    data_location: Optional[str],
+    reference: str,
+):
+    db = get_lance_connection(data_location)
+    try:
+        return open_table_at_reference(db, dataset_name, reference)
+    except InvalidDatasetReference as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 def serialize_schema_metadata(metadata):
@@ -225,10 +364,19 @@ async def health_check():
         logger.error(f"Error in health check: {e}")
         return {"ok": False, "error": str(e)}
 
+
+@app.get("/config")
+def get_config():
+    return {
+        "data_path_configured": bool(DATA_PATH),
+        "default_reference": "main",
+    }
+
+
 @app.get("/datasets")
-def list_datasets():
+def list_datasets(data_location: Optional[str] = Query(default=None)):
     try:
-        db = get_lance_connection()
+        db = get_lance_connection(data_location)
         if hasattr(db, "list_tables"):
             table_names = db.list_tables().tables
         else:
@@ -237,54 +385,71 @@ def list_datasets():
             table_names = db.table_names()
         valid_tables = [name for name in table_names if validate_dataset_name(name)]
         return {"datasets": valid_tables}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing datasets: {e}")
         raise HTTPException(status_code=500, detail="Failed to list datasets")
 
 
 @app.get("/datasets/{dataset_name}/metadata")
-def get_dataset_metadata(dataset_name: str):
+def get_dataset_metadata(
+    dataset_name: str,
+    data_location: Optional[str] = Query(default=None),
+    reference: str = Query(default="main"),
+):
     if not validate_dataset_name(dataset_name):
         raise HTTPException(status_code=400, detail="Invalid dataset name")
 
     try:
-        db = get_lance_connection()
-        table = db.open_table(dataset_name)
+        table = get_dataset_table(dataset_name, data_location, reference)
         return describe_schema(table.schema)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting metadata for {dataset_name}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get dataset metadata")
 
 
 @app.get("/datasets/{dataset_name}/schema")
-def get_dataset_schema(dataset_name: str):
+def get_dataset_schema(
+    dataset_name: str,
+    data_location: Optional[str] = Query(default=None),
+    reference: str = Query(default="main"),
+):
     if not validate_dataset_name(dataset_name):
         raise HTTPException(status_code=400, detail="Invalid dataset name")
 
     try:
-        db = get_lance_connection()
-        table = db.open_table(dataset_name)
+        table = get_dataset_table(dataset_name, data_location, reference)
         description = describe_schema(table.schema)
         return {
             "fields": description["fields"],
             "metadata": description["metadata"],
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting schema for {dataset_name}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get dataset schema")
 
 @app.get("/datasets/{dataset_name}/columns")
-def get_dataset_columns(dataset_name: str):
+def get_dataset_columns(
+    dataset_name: str,
+    data_location: Optional[str] = Query(default=None),
+    reference: str = Query(default="main"),
+):
     if not validate_dataset_name(dataset_name):
         raise HTTPException(status_code=400, detail="Invalid dataset name")
 
     try:
-        db = get_lance_connection()
-        table = db.open_table(dataset_name)
+        table = get_dataset_table(dataset_name, data_location, reference)
         description = describe_schema(table.schema)
         return {"columns": description["columns"]}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting columns for {dataset_name}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get dataset columns")
@@ -294,14 +459,15 @@ def get_dataset_rows(
     dataset_name: str,
     limit: int = Query(default=50, ge=1, le=MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
-    columns: Optional[str] = Query(default=None)
+    columns: Optional[str] = Query(default=None),
+    data_location: Optional[str] = Query(default=None),
+    reference: str = Query(default="main"),
 ):
     if not validate_dataset_name(dataset_name):
         raise HTTPException(status_code=400, detail="Invalid dataset name")
 
     try:
-        db = get_lance_connection()
-        table = db.open_table(dataset_name)
+        table = get_dataset_table(dataset_name, data_location, reference)
 
         column_list = None
         if columns:
@@ -394,14 +560,15 @@ def get_dataset_rows(
 def get_vector_preview(
     dataset_name: str,
     column: str,
-    limit: int = Query(default=100, le=MAX_LIMIT)
+    limit: int = Query(default=100, le=MAX_LIMIT),
+    data_location: Optional[str] = Query(default=None),
+    reference: str = Query(default="main"),
 ):
     if not validate_dataset_name(dataset_name):
         raise HTTPException(status_code=400, detail="Invalid dataset name")
 
     try:
-        db = get_lance_connection()
-        table = db.open_table(dataset_name)
+        table = get_dataset_table(dataset_name, data_location, reference)
 
         if column not in [field.name for field in table.schema]:
             raise HTTPException(status_code=400, detail=f"Column '{column}' not found")

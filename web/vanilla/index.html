@@ -15,6 +15,22 @@
             <div class="health-status" id="healthStatus">Connecting...</div>
         </header>
 
+        <section class="connection-panel">
+            <div class="connection-field" id="dataLocationField">
+                <label for="dataLocation">Lance dataset location</label>
+                <input id="dataLocation" type="text" placeholder="/path/to/data or s3://bucket/data" required>
+                <small>Enter a path or URI accessible to the viewer server.</small>
+            </div>
+            <div class="connection-field">
+                <label for="datasetReference">Tag or version</label>
+                <input id="datasetReference" type="text" value="main"
+                    placeholder="main, 42, or tag:release">
+                <small>Use main, a version number, or tag:name.</small>
+            </div>
+            <button id="openDatasetLocation" type="button">Open</button>
+            <div class="connection-error" id="connectionError" role="alert"></div>
+        </section>
+
         <main class="main-content">
             <aside class="sidebar">
                 <div class="sidebar-section">

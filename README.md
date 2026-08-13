@@ -30,6 +30,12 @@ docker run --rm -p 8080:8080 \
     ghcr.io/lance-format/lance-data-viewer:lancedb-0.36.0
 ```
 
+To enter the database location in the web UI instead of mounting it, set
+`DATA_PATH` to an empty value with `-e DATA_PATH=`. The location can be a local
+path that the viewer process can read, or an object store URI that LanceDB
+supports. Only enable this mode for users you trust, because they can then read
+any Lance dataset the server can reach.
+
 4. **Open the UI**
 
 ```
@@ -78,6 +84,7 @@ docker run --rm -p 8080:8080 \
 ### Features
 
 - **Read-only browsing** with organized left sidebar (Datasets → Columns → Schema)
+- **Version browsing** for main, numeric versions, and tags
 - **Advanced vector visualization** with CLIP embedding detection and sparkline charts
 - **Schema analysis** with vector column highlighting and type detection
 - **Server-side pagination** with inline controls and column filtering
@@ -88,11 +95,18 @@ docker run --rm -p 8080:8080 \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATA_PATH` | `/data` | Directory containing Lance tables |
+| `DATA_PATH` | `/data` | Directory containing Lance tables. Set it empty to ask in the UI |
 | `PORT` | `8080` | Port the server listens on |
 
 - **Port:** change host port with `-p 9000:8080`, or set `PORT` env var to change the container's listening port.
 - **Read-only mount:** keep `:ro` to avoid accidental writes in future versions.
+
+When `DATA_PATH` is empty, the UI asks for a Lance database location before it
+loads tables. The reference field accepts:
+
+- `main` for the latest snapshot on the main branch (default)
+- `42` for version 42 on main
+- `tag:release` for a tag
 
 ### Docker Compose
 
@@ -218,6 +232,7 @@ The viewer provides advanced visualization for vector embeddings:
 - Container runs as non-root
 - No authentication; bind to localhost during development and run behind a reverse proxy if exposing
 - Read-only access prevents accidental data modification
+- With an empty `DATA_PATH`, the UI can open any location the server can read; do not expose that mode to untrusted users
 
 ### Contributing
 
