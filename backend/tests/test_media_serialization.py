@@ -6,6 +6,22 @@ import pytest
 from serialize_value import detect_media_type, serialize_value
 
 
+# A 4x1 24-bit bitmap: the 14-byte file header, a 40-byte DIB header, and
+# one row of pixel data.
+BMP_IMAGE = (
+    b"BM"
+    + (66).to_bytes(4, "little")
+    + b"\x00\x00\x00\x00"
+    + (54).to_bytes(4, "little")
+    + (40).to_bytes(4, "little")
+    + (4).to_bytes(4, "little")
+    + (1).to_bytes(4, "little")
+    + (1).to_bytes(2, "little")
+    + (24).to_bytes(2, "little")
+    + b"\x00" * 24
+)
+
+
 @pytest.mark.parametrize(
     ("payload", "media_type", "mime_type"),
     [
@@ -15,10 +31,26 @@ from serialize_value import detect_media_type, serialize_value
         (b"ID3\x04\x00\x00payload", "audio", "audio/mpeg"),
         (b"\x00\x00\x00\x18ftypisompayload", "video", "video/mp4"),
         (b"\x1aE\xdf\xa3payload", "video", "video/webm"),
+        (BMP_IMAGE, "image", "image/bmp"),
     ],
 )
 def test_detect_media_type(payload, media_type, mime_type):
     assert detect_media_type(payload) == (media_type, mime_type)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"BMW is a great car",
+        b"BM25 scoring is used for full-text search",
+        b"ID3 tag documentation",
+        b"ID3v2 notes",
+    ],
+)
+def test_text_that_starts_with_a_signature_stays_text(payload):
+    """"BM" and "ID3" are printable, so plain text can start with them."""
+    assert detect_media_type(payload) is None
+    assert serialize_value(payload) == payload.decode("utf-8")
 
 
 def test_media_binary_serialization():

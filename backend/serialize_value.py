@@ -5,6 +5,35 @@ import numpy as np
 import pyarrow as pa
 
 
+# Sizes of the DIB header that follows the 14-byte BMP file header. Every
+# valid BMP uses one of these, so it tells a real bitmap apart from text.
+_BMP_DIB_HEADER_SIZES = frozenset({12, 40, 52, 56, 64, 108, 124})
+
+
+def _is_bmp(raw: bytes) -> bool:
+    """Check the BMP magic and the DIB header behind it.
+
+    "BM" on its own is two printable characters, so text such as "BM25" would
+    otherwise be read as a bitmap.
+    """
+    if len(raw) < 18 or not raw.startswith(b"BM"):
+        return False
+    return int.from_bytes(raw[14:18], "little") in _BMP_DIB_HEADER_SIZES
+
+
+def _is_id3(raw: bytes) -> bool:
+    """Check the ID3v2 magic, version, and synchsafe size.
+
+    "ID3" is also three printable characters, so text such as "ID3 tags" would
+    otherwise be read as an MP3.
+    """
+    if len(raw) < 10 or not raw.startswith(b"ID3"):
+        return False
+    if raw[3] not in (2, 3, 4) or raw[4] == 0xFF:
+        return False
+    return all(byte < 0x80 for byte in raw[6:10])
+
+
 def detect_media_type(raw: bytes):
     """Return (media category, MIME type) from common file signatures."""
     if raw.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -13,7 +42,7 @@ def detect_media_type(raw: bytes):
         return "image", "image/jpeg"
     if raw.startswith((b"GIF87a", b"GIF89a")):
         return "image", "image/gif"
-    if raw.startswith(b"BM"):
+    if _is_bmp(raw):
         return "image", "image/bmp"
     if raw.startswith((b"II*\x00", b"MM\x00*")):
         return "image", "image/tiff"
@@ -31,7 +60,7 @@ def detect_media_type(raw: bytes):
         return "audio", "audio/flac"
     if raw.startswith(b"OggS"):
         return "audio", "audio/ogg"
-    if raw.startswith(b"ID3") or (
+    if _is_id3(raw) or (
         len(raw) >= 128 and raw[0] == 0xFF and raw[1] & 0xE0 == 0xE0
     ):
         return "audio", "audio/mpeg"
