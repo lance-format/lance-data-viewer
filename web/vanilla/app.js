@@ -374,6 +374,8 @@ class LanceViewer {
                 if (value && typeof value === 'object') {
                     if (value.type === 'vector') {
                         this.renderVectorCell(td, value, column);
+                    } else if (value.type === 'media') {
+                        this.renderMediaCell(td, value);
                     } else {
                         // Pass complex objects to our new recursive UI builder
                         this.renderComplexObject(td, value, column);
@@ -388,6 +390,56 @@ class LanceViewer {
         });
 
         this.elements.dataSection.style.display = 'block';
+    }
+
+    renderMediaCell(cell, mediaData) {
+        cell.className = 'media-cell';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'media-preview';
+
+        if (!mediaData.base64) {
+            const summary = document.createElement('div');
+            summary.className = 'media-info media-too-large';
+            summary.textContent = `${mediaData.mime_type} • ${this.formatBytes(mediaData.size)} • too large to preview`;
+            wrapper.appendChild(summary);
+            cell.appendChild(wrapper);
+            return;
+        }
+
+        const source = `data:${mediaData.mime_type};base64,${mediaData.base64}`;
+
+        let mediaElement;
+        if (mediaData.media_type === 'image') {
+            mediaElement = document.createElement('img');
+            mediaElement.alt = mediaData.mime_type;
+            mediaElement.loading = 'lazy';
+        } else if (mediaData.media_type === 'audio') {
+            mediaElement = document.createElement('audio');
+            mediaElement.controls = true;
+            mediaElement.preload = 'metadata';
+        } else if (mediaData.media_type === 'video') {
+            mediaElement = document.createElement('video');
+            mediaElement.controls = true;
+            mediaElement.preload = 'metadata';
+        } else {
+            cell.textContent = `Unsupported media type: ${mediaData.mime_type}`;
+            return;
+        }
+
+        mediaElement.src = source;
+        const info = document.createElement('div');
+        info.className = 'media-info';
+        info.textContent = `${mediaData.mime_type} • ${this.formatBytes(mediaData.size)}`;
+
+        wrapper.appendChild(mediaElement);
+        wrapper.appendChild(info);
+        cell.appendChild(wrapper);
+    }
+
+    formatBytes(size) {
+        if (size < 1024) return `${size} B`;
+        if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+        return `${(size / (1024 * 1024)).toFixed(1)} MB`;
     }
 
     renderVectorCell(cell, vectorData, columnName) {
@@ -592,7 +644,15 @@ class LanceViewer {
             return;
         }
 
-       // 4. Handle Arrays
+        // 4. Handle Nested Media
+        if (obj.type === 'media') {
+            const mediaWrap = document.createElement('div');
+            this.renderMediaCell(mediaWrap, obj);
+            parent.appendChild(mediaWrap);
+            return;
+        }
+
+       // 5. Handle Arrays
         if (Array.isArray(obj)) {
             const list = document.createElement('div');
             list.className = 'co-list';

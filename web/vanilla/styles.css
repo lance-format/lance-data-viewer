@@ -340,6 +340,44 @@ table tr:hover {
     background-color: #f8f9fa;
 }
 
+.media-cell {
+    min-width: 240px;
+}
+
+.media-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.media-preview img,
+.media-preview video {
+    width: 240px;
+    max-height: 180px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: #f8f9fa;
+}
+
+.media-preview audio {
+    width: 280px;
+    max-width: 100%;
+}
+
+.media-info {
+    color: #6c757d;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.75rem;
+}
+
+.media-too-large {
+    background: #f8f9fa;
+    border: 1px dashed #ced4da;
+    border-radius: 4px;
+    padding: 12px;
+}
+
 .vector-cell {
     max-width: 200px;
     position: relative;
