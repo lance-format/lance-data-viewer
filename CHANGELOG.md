@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Inline preview for small media held in binary columns. The backend detects images, audio, and video from file signatures and returns the MIME type with the size. A value of 64 KiB or less carries a base64 payload, and the table draws it inline. A larger value returns its type and size only (#3).
 - Tables can be opened at main, a numeric version, or a tag (#83).
 - Dataset locations can be selected in the UI when `DATA_PATH` is set to an empty value (#83).
 - CI smoke test. Each build starts the image it just built and checks `/healthz`, `/datasets`, and the static files, before the image is published (#67).
