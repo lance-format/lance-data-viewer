@@ -306,6 +306,13 @@ table tr:hover {
     font-size: 0.75rem;
 }
 
+.media-too-large {
+    background: #f8f9fa;
+    border: 1px dashed #ced4da;
+    border-radius: 4px;
+    padding: 12px;
+}
+
 .vector-cell {
     max-width: 200px;
     position: relative;

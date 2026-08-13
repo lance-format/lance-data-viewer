@@ -3,7 +3,11 @@ import base64
 import pyarrow as pa
 import pytest
 
-from serialize_value import detect_media_type, serialize_value
+from serialize_value import (
+    MEDIA_INLINE_MAX_BYTES,
+    detect_media_type,
+    serialize_value,
+)
 
 
 # A 4x1 24-bit bitmap: the 14-byte file header, a 40-byte DIB header, and
@@ -61,8 +65,30 @@ def test_media_binary_serialization():
         "media_type": "image",
         "mime_type": "image/png",
         "size": len(payload),
+        "inline": True,
         "base64": base64.b64encode(payload).decode("ascii"),
     }
+
+
+def test_media_at_the_size_limit_is_still_inline():
+    payload = b"\x89PNG\r\n\x1a\n" + b"\x00" * (MEDIA_INLINE_MAX_BYTES - 8)
+    result = serialize_value(payload)
+    assert len(payload) == MEDIA_INLINE_MAX_BYTES
+    assert result["inline"] is True
+    assert result["base64"] == base64.b64encode(payload).decode("ascii")
+
+
+def test_media_over_the_size_limit_carries_no_payload():
+    payload = b"\x89PNG\r\n\x1a\n" + b"\x00" * MEDIA_INLINE_MAX_BYTES
+    result = serialize_value(payload)
+    assert result == {
+        "type": "media",
+        "media_type": "image",
+        "mime_type": "image/png",
+        "size": len(payload),
+        "inline": False,
+    }
+    assert "base64" not in result
 
 
 def test_non_media_binary_serialization_is_unchanged():

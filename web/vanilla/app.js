@@ -302,6 +302,16 @@ class LanceViewer {
         cell.className = 'media-cell';
         const wrapper = document.createElement('div');
         wrapper.className = 'media-preview';
+
+        if (!mediaData.base64) {
+            const summary = document.createElement('div');
+            summary.className = 'media-info media-too-large';
+            summary.textContent = `${mediaData.mime_type} • ${this.formatBytes(mediaData.size)} • too large to preview`;
+            wrapper.appendChild(summary);
+            cell.appendChild(wrapper);
+            return;
+        }
+
         const source = `data:${mediaData.mime_type};base64,${mediaData.base64}`;
 
         let mediaElement;

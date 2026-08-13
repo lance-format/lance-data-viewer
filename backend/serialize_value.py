@@ -5,6 +5,10 @@ import numpy as np
 import pyarrow as pa
 
 
+# Media larger than this is described but not sent. Base64 adds a third to
+# the size, so a page of 50 rows stays near 4 MB in the worst case.
+MEDIA_INLINE_MAX_BYTES = 64 * 1024
+
 # Sizes of the DIB header that follows the 14-byte BMP file header. Every
 # valid BMP uses one of these, so it tells a real bitmap apart from text.
 _BMP_DIB_HEADER_SIZES = frozenset({12, 40, 52, 56, 64, 108, 124})
@@ -91,13 +95,16 @@ def _serialize_binary(raw):
     media = detect_media_type(raw)
     if media:
         media_type, mime_type = media
-        return {
+        value = {
             "type": "media",
             "media_type": media_type,
             "mime_type": mime_type,
             "size": len(raw),
-            "base64": base64.b64encode(raw).decode("ascii"),
+            "inline": len(raw) <= MEDIA_INLINE_MAX_BYTES,
         }
+        if value["inline"]:
+            value["base64"] = base64.b64encode(raw).decode("ascii")
+        return value
 
     try:
         return raw.decode("utf-8")
