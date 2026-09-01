@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Frontend content is now built with safe DOM APIs instead of `innerHTML`, preventing dataset-controlled column names from injecting markup through vector tooltips (#32).
+- Older dataset, metadata, and row responses no longer overwrite a newer selection when requests finish out of order (#79).
 - `docker build` no longer fails with "the destination must be a directory and end with a /". `COPY backend/*.py .` needs a trailing slash when it copies more than one file. The classic builder rejected it, the BuildKit builder did not (#62).
 - CI publishes no image until the test job passes. The build job now depends on the test job, so a failing test stops the release (#66).
 - CI and release builds preserve the legacy LanceDB 0.3.1, 0.3.4, and 0.5 variants by reusing their last published dependency layers. Their packages are no longer available from PyPI (#92).

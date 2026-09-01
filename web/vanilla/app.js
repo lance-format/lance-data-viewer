@@ -10,6 +10,9 @@ class LanceViewer {
         this.dataPathConfigured = false;
         this.currentDataLocation = '';
         this.currentReference = 'main';
+        this.datasetListRequestId = 0;
+        this.metadataRequestId = 0;
+        this.dataRequestId = 0;
 
         this.initializeElements();
         this.setupEventListeners();
@@ -124,6 +127,8 @@ class LanceViewer {
         this.currentReference = this.elements.datasetReference.value.trim() || 'main';
         this.elements.datasetReference.value = this.currentReference;
         this.elements.connectionError.textContent = '';
+        this.metadataRequestId++;
+        this.dataRequestId++;
         this.currentDataset = null;
         this.elements.datasetHeader.style.display = 'none';
         this.elements.columnSection.style.display = 'none';
@@ -190,6 +195,8 @@ class LanceViewer {
     }
 
     async loadDatasets() {
+        const requestId = ++this.datasetListRequestId;
+
         try {
             this.replaceWithMessage(this.elements.datasetList, 'Loading datasets...', 'loading');
             const params = this.contextParams(false);
@@ -200,11 +207,13 @@ class LanceViewer {
             }
             const data = await response.json();
 
+            if (requestId !== this.datasetListRequestId) return false;
+
             this.elements.datasetList.replaceChildren();
 
             if (data.datasets.length === 0) {
                 this.replaceWithMessage(this.elements.datasetList, 'No datasets found', 'loading');
-                return;
+                return true;
             }
 
             data.datasets.forEach(dataset => {
@@ -214,9 +223,13 @@ class LanceViewer {
                 item.addEventListener('click', () => this.selectDataset(dataset, item));
                 this.elements.datasetList.appendChild(item);
             });
+            return true;
         } catch (error) {
+            if (requestId !== this.datasetListRequestId) return false;
+
             this.replaceWithMessage(this.elements.datasetList, 'Failed to load datasets', 'error');
             this.showConnectionError(error.message);
+            return false;
         }
     }
 
@@ -242,19 +255,33 @@ class LanceViewer {
     }
 
     async loadMetadata() {
+        const requestId = ++this.metadataRequestId;
+        const datasetName = this.currentDataset;
+
         try {
             const params = this.contextParams();
             const response = await fetch(
-                `${this.apiBase}/datasets/${encodeURIComponent(this.currentDataset)}/metadata?${params}`
+                `${this.apiBase}/datasets/${encodeURIComponent(datasetName)}/metadata?${params}`
             );
             if (!response.ok) {
                 throw new Error(await this.responseError(response));
             }
             const metadata = await response.json();
+
+            if (
+                requestId !== this.metadataRequestId
+                || datasetName !== this.currentDataset
+            ) return false;
+
             this.renderSchema(metadata.fields);
             this.renderColumns(metadata.columns);
             return true;
         } catch (error) {
+            if (
+                requestId !== this.metadataRequestId
+                || datasetName !== this.currentDataset
+            ) return false;
+
             this.showConnectionError(error.message);
             this.showError(error.message);
             return false;
@@ -328,6 +355,8 @@ class LanceViewer {
     async loadData() {
         if (!this.currentDataset) return;
 
+        const requestId = ++this.dataRequestId;
+        const datasetName = this.currentDataset;
         this.showLoading();
 
         try {
@@ -343,12 +372,17 @@ class LanceViewer {
             }
 
             const response = await fetch(
-                `${this.apiBase}/datasets/${encodeURIComponent(this.currentDataset)}/rows?${params}`
+                `${this.apiBase}/datasets/${encodeURIComponent(datasetName)}/rows?${params}`
             );
             if (!response.ok) {
                 throw new Error(await this.responseError(response));
             }
             const data = await response.json();
+
+            if (
+                requestId !== this.dataRequestId
+                || datasetName !== this.currentDataset
+            ) return false;
 
             this.totalRows = data.total;
             this.renderTable(data.rows);
@@ -357,6 +391,11 @@ class LanceViewer {
             return true;
 
         } catch (error) {
+            if (
+                requestId !== this.dataRequestId
+                || datasetName !== this.currentDataset
+            ) return false;
+
             this.hideLoading();
             this.showConnectionError(error.message);
             this.showError(error.message);
