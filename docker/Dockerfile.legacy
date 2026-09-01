@@ -1,0 +1,51 @@
+ARG LEGACY_IMAGE=ghcr.io/lance-format/lance-data-viewer
+ARG LANCEDB_VERSION=0.3.4
+
+# LanceDB 0.3.1, 0.3.4, and 0.5 are no longer available from PyPI. Preserve
+# their installed dependency trees from the last published multi-arch images,
+# then build a clean runtime image with the current application source.
+FROM ${LEGACY_IMAGE}:lancedb-${LANCEDB_VERSION} AS legacy-dependencies
+
+FROM python:3.11-slim-bookworm
+
+RUN groupadd -r appuser && useradd -r -g appuser -u 1001 appuser
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=legacy-dependencies /home/appuser/.local /home/appuser/.local
+
+WORKDIR /app
+
+COPY backend/*.py ./
+COPY VERSION .
+COPY docker/entrypoint.sh /app/entrypoint.sh
+COPY web/vanilla/ /web/
+
+RUN chmod +x /app/entrypoint.sh
+RUN chown -R appuser:appuser /app /web
+RUN chmod -R 755 /web
+
+USER appuser
+
+ENV PATH=/home/appuser/.local/bin:$PATH
+ENV DATA_PATH=/data
+ENV PORT=8080
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -fsS http://localhost:${PORT}/healthz || exit 1
+
+ARG LANCEDB_VERSION=0.3.4
+ARG APP_VERSION=0.0.0-dev
+
+LABEL org.opencontainers.image.title="Lance Data Viewer"
+LABEL org.opencontainers.image.description="Read-only web viewer for Lance datasets"
+LABEL org.opencontainers.image.source="https://github.com/lance-format/lance-data-viewer"
+LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL com.github.lancedb.version="${LANCEDB_VERSION}"
+
+ENTRYPOINT ["/app/entrypoint.sh"]
