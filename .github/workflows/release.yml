@@ -15,7 +15,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, frontend-test]
     permissions:
       contents: read
       packages: write
@@ -198,3 +198,20 @@ jobs:
         docker run --rm \
           -v "${GITHUB_WORKSPACE}:/src:ro" \
           legacy-tests:${{ matrix.lancedb }}
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+
+    - name: Check frontend syntax
+      run: node --check web/vanilla/app.js
+
+    - name: Run frontend tests
+      run: node --test web/vanilla/tests/*.test.js
