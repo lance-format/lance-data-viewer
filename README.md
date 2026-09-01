@@ -170,7 +170,15 @@ curl "http://localhost:8080/datasets/your-dataset/rows?limit=5"
 
 ### Run the test suite
 
-The API tests run without Docker. With Python 3.11:
+CI uses Node.js 24 for the frontend tests. These tests use only built-in
+Node.js modules, so package installation is not necessary.
+
+```bash
+node --check web/vanilla/app.js
+node --test web/vanilla/tests/*.test.js
+```
+
+The API tests run without Docker and require Python 3.11.
 
 ```bash
 pip install -c backend/constraints-0.36.0.txt -r backend/requirements.txt
@@ -178,10 +186,10 @@ pip install pytest httpx2
 cd backend && python -m pytest tests/ -v
 ```
 
-Swap the constraints file to test against a different Lance version. CI runs
-the suite against every supported version. LanceDB 0.3.1, 0.3.4, and 0.5 can
-only be tested through their published images because their packages are no
-longer available from PyPI.
+Use a different constraints file to run the API tests with another LanceDB
+version. CI runs the frontend tests once. It runs the API tests against each
+supported version. LanceDB 0.3.1, 0.3.4, and 0.5 use published images because
+their packages are no longer available from PyPI.
 
 ### Development workflow
 
