@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Python package builds now require setuptools 83 or newer and wheel 0.47 or newer.
 
 ### Fixed
+- Frontend content is now built with safe DOM APIs instead of `innerHTML`, preventing dataset-controlled column names from injecting markup through vector tooltips (#32).
 - `docker build` no longer fails with "the destination must be a directory and end with a /". `COPY backend/*.py .` needs a trailing slash when it copies more than one file. The classic builder rejected it, the BuildKit builder did not (#62).
 - CI publishes no image until the test job passes. The build job now depends on the test job, so a failing test stops the release (#66).
 
