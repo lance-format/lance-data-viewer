@@ -80,6 +80,13 @@ class LanceViewer {
         });
     }
 
+    replaceWithMessage(element, message, className) {
+        const messageElement = document.createElement('div');
+        messageElement.className = className;
+        messageElement.textContent = message;
+        element.replaceChildren(messageElement);
+    }
+
     async initializeConnection() {
         try {
             const response = await fetch(`${this.apiBase}/config`);
@@ -93,8 +100,11 @@ class LanceViewer {
                 this.elements.dataLocationField.style.display = 'none';
                 await this.loadDatasets();
             } else {
-                this.elements.datasetList.innerHTML =
-                    '<div class="loading">Enter a Lance dataset location above.</div>';
+                this.replaceWithMessage(
+                    this.elements.datasetList,
+                    'Enter a Lance dataset location above.',
+                    'loading'
+                );
                 this.elements.dataLocation.focus();
             }
         } catch (error) {
@@ -156,12 +166,19 @@ class LanceViewer {
                 // Show Lance version prominently along with app version
                 const lanceVersion = data.lancedb_version || 'unknown';
                 const pyarrowVersion = data.pyarrow_version || 'unknown';
-                this.elements.healthStatus.innerHTML = `
-                    <div class="version-info">
-                        <div class="app-version">Lance Data Viewer v${data.app_version}</div>
-                        <div class="lance-version">LanceDB ${lanceVersion} • PyArrow ${pyarrowVersion}</div>
-                    </div>
-                `;
+                const versionInfo = document.createElement('div');
+                versionInfo.className = 'version-info';
+
+                const appVersion = document.createElement('div');
+                appVersion.className = 'app-version';
+                appVersion.textContent = `Lance Data Viewer v${data.app_version}`;
+
+                const lanceVersionInfo = document.createElement('div');
+                lanceVersionInfo.className = 'lance-version';
+                lanceVersionInfo.textContent = `LanceDB ${lanceVersion} • PyArrow ${pyarrowVersion}`;
+
+                versionInfo.append(appVersion, lanceVersionInfo);
+                this.elements.healthStatus.replaceChildren(versionInfo);
                 this.elements.healthStatus.className = 'health-status healthy';
             } else {
                 throw new Error('Health check failed');
@@ -174,7 +191,7 @@ class LanceViewer {
 
     async loadDatasets() {
         try {
-            this.elements.datasetList.innerHTML = '<div class="loading">Loading datasets...</div>';
+            this.replaceWithMessage(this.elements.datasetList, 'Loading datasets...', 'loading');
             const params = this.contextParams(false);
             const suffix = params.toString() ? `?${params}` : '';
             const response = await fetch(`${this.apiBase}/datasets${suffix}`);
@@ -183,10 +200,10 @@ class LanceViewer {
             }
             const data = await response.json();
 
-            this.elements.datasetList.innerHTML = '';
+            this.elements.datasetList.replaceChildren();
 
             if (data.datasets.length === 0) {
-                this.elements.datasetList.innerHTML = '<div class="loading">No datasets found</div>';
+                this.replaceWithMessage(this.elements.datasetList, 'No datasets found', 'loading');
                 return;
             }
 
@@ -198,7 +215,7 @@ class LanceViewer {
                 this.elements.datasetList.appendChild(item);
             });
         } catch (error) {
-            this.elements.datasetList.innerHTML = '<div class="error">Failed to load datasets</div>';
+            this.replaceWithMessage(this.elements.datasetList, 'Failed to load datasets', 'error');
             this.showConnectionError(error.message);
         }
     }
@@ -245,7 +262,7 @@ class LanceViewer {
     }
 
     renderSchema(fields) {
-        this.elements.schemaDisplay.innerHTML = '';
+        this.elements.schemaDisplay.replaceChildren();
         fields.forEach(field => {
             const fieldDiv = document.createElement('div');
             const isVector = field.type.includes('list<item: double>') || field.type.includes('fixed_size_list<item: float>');
@@ -274,7 +291,7 @@ class LanceViewer {
         this.allColumns = columns;
         this.selectedColumns = columns.map(col => col.name);
 
-        this.elements.columnSelect.innerHTML = '';
+        this.elements.columnSelect.replaceChildren();
         columns.forEach(column => {
             const option = document.createElement('option');
             option.value = column.name;
@@ -349,13 +366,18 @@ class LanceViewer {
 
     renderTable(rows) {
         if (rows.length === 0) {
-            this.elements.tableBody.innerHTML = '<tr><td colspan="100%">No data found</td></tr>';
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = Math.max(this.selectedColumns.length, 1);
+            cell.textContent = 'No data found';
+            row.appendChild(cell);
+            this.elements.tableBody.replaceChildren(row);
             return;
         }
 
         const columns = Object.keys(rows[0]);
 
-        this.elements.tableHead.innerHTML = '';
+        this.elements.tableHead.replaceChildren();
         const headerRow = document.createElement('tr');
         columns.forEach(column => {
             const th = document.createElement('th');
@@ -364,7 +386,7 @@ class LanceViewer {
         });
         this.elements.tableHead.appendChild(headerRow);
 
-        this.elements.tableBody.innerHTML = '';
+        this.elements.tableBody.replaceChildren();
         rows.forEach(row => {
             const tr = document.createElement('tr');
             columns.forEach(column => {
@@ -460,11 +482,19 @@ class LanceViewer {
 
         // Enhanced info display for CLIP vectors
         if (vectorData.model === 'likely_clip') {
-            info.innerHTML = `
-                <span class="vector-model">CLIP</span>
-                <span class="vector-dim">dim: ${vectorData.dim}</span>
-                <span class="vector-norm">norm: ${vectorData.norm.toFixed(3)}</span>
-            `;
+            const model = document.createElement('span');
+            model.className = 'vector-model';
+            model.textContent = 'CLIP';
+
+            const dimension = document.createElement('span');
+            dimension.className = 'vector-dim';
+            dimension.textContent = `dim: ${vectorData.dim}`;
+
+            const norm = document.createElement('span');
+            norm.className = 'vector-norm';
+            norm.textContent = `norm: ${vectorData.norm.toFixed(3)}`;
+
+            info.append(model, dimension, norm);
             if (vectorData.stats && vectorData.stats.normalized) {
                 info.classList.add('normalized');
             }
@@ -528,31 +558,38 @@ class LanceViewer {
         const tooltip = this.elements.tooltip;
         const content = tooltip.querySelector('.tooltip-content');
 
-        let tooltipHtml = `<strong>${columnName}</strong><br>`;
+        content.replaceChildren();
+
+        const title = document.createElement('strong');
+        title.textContent = columnName;
+        content.append(title, document.createElement('br'));
+
+        const appendLine = (text = '') => {
+            content.append(document.createTextNode(text), document.createElement('br'));
+        };
 
         if (vectorData.model === 'likely_clip') {
-            tooltipHtml += `
-                <span class="model-badge">CLIP Embedding</span><br>
-                ${vectorData.description}<br><br>
-                Dimension: ${vectorData.dim}<br>
-                Norm: ${vectorData.norm.toFixed(4)} ${vectorData.stats.normalized ? '(normalized ✓)' : ''}<br>
-                Range: ${vectorData.min.toFixed(4)} to ${vectorData.max.toFixed(4)}<br>
-                Mean: ${vectorData.mean.toFixed(4)}<br>
-                Sparsity: ${(vectorData.stats.sparsity * 100).toFixed(1)}%<br>
-                Positive ratio: ${(vectorData.stats.positive_ratio * 100).toFixed(1)}%<br><br>
-                Preview: [${vectorData.preview.slice(0, 8).map(v => v.toFixed(3)).join(', ')}...]
-            `;
+            const badge = document.createElement('span');
+            badge.className = 'model-badge';
+            badge.textContent = 'CLIP Embedding';
+            content.append(badge, document.createElement('br'));
+            appendLine(vectorData.description);
+            appendLine();
+            appendLine(`Dimension: ${vectorData.dim}`);
+            appendLine(`Norm: ${vectorData.norm.toFixed(4)} ${vectorData.stats.normalized ? '(normalized ✓)' : ''}`);
+            appendLine(`Range: ${vectorData.min.toFixed(4)} to ${vectorData.max.toFixed(4)}`);
+            appendLine(`Mean: ${vectorData.mean.toFixed(4)}`);
+            appendLine(`Sparsity: ${(vectorData.stats.sparsity * 100).toFixed(1)}%`);
+            appendLine(`Positive ratio: ${(vectorData.stats.positive_ratio * 100).toFixed(1)}%`);
+            appendLine();
+            appendLine(`Preview: [${vectorData.preview.slice(0, 8).map(v => v.toFixed(3)).join(', ')}...]`);
         } else {
-            tooltipHtml += `
-                Dimension: ${vectorData.dim}<br>
-                Norm: ${vectorData.norm.toFixed(4)}<br>
-                Min: ${vectorData.min.toFixed(4)}<br>
-                Max: ${vectorData.max.toFixed(4)}<br>
-                Preview: [${vectorData.preview.slice(0, 8).map(v => v.toFixed(2)).join(', ')}...]
-            `;
+            appendLine(`Dimension: ${vectorData.dim}`);
+            appendLine(`Norm: ${vectorData.norm.toFixed(4)}`);
+            appendLine(`Min: ${vectorData.min.toFixed(4)}`);
+            appendLine(`Max: ${vectorData.max.toFixed(4)}`);
+            appendLine(`Preview: [${vectorData.preview.slice(0, 8).map(v => v.toFixed(2)).join(', ')}...]`);
         }
-
-        content.innerHTML = tooltipHtml;
         tooltip.style.display = 'block';
         this.updateTooltipPosition(event);
     }
