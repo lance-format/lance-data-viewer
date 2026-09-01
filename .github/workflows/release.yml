@@ -21,7 +21,15 @@ jobs:
       packages: write
     strategy:
       matrix:
-        lancedb: ["0.3.1", "0.3.4", "0.5", "0.16.0", "0.24.3", "0.29.2", "0.33.0", "0.36.0"]
+        include:
+          - { lancedb: "0.3.1", dockerfile: ./docker/Dockerfile.legacy }
+          - { lancedb: "0.3.4", dockerfile: ./docker/Dockerfile.legacy }
+          - { lancedb: "0.5", dockerfile: ./docker/Dockerfile.legacy }
+          - { lancedb: "0.16.0", dockerfile: ./docker/Dockerfile }
+          - { lancedb: "0.24.3", dockerfile: ./docker/Dockerfile }
+          - { lancedb: "0.29.2", dockerfile: ./docker/Dockerfile }
+          - { lancedb: "0.33.0", dockerfile: ./docker/Dockerfile }
+          - { lancedb: "0.36.0", dockerfile: ./docker/Dockerfile }
 
     steps:
     - name: Checkout repository
@@ -64,7 +72,7 @@ jobs:
       uses: docker/build-push-action@v7
       with:
         context: .
-        file: ./docker/Dockerfile
+        file: ${{ matrix.dockerfile }}
         load: true
         platforms: linux/amd64
         tags: smoke:${{ matrix.lancedb }}
@@ -126,7 +134,7 @@ jobs:
       uses: docker/build-push-action@v7
       with:
         context: .
-        file: ./docker/Dockerfile
+        file: ${{ matrix.dockerfile }}
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -141,17 +149,27 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        lancedb: ["0.3.1", "0.3.4", "0.5", "0.16.0", "0.24.3", "0.29.2", "0.33.0", "0.36.0"]
+        include:
+          - { lancedb: "0.3.1", legacy: true }
+          - { lancedb: "0.3.4", legacy: true }
+          - { lancedb: "0.5", legacy: true }
+          - { lancedb: "0.16.0", legacy: false }
+          - { lancedb: "0.24.3", legacy: false }
+          - { lancedb: "0.29.2", legacy: false }
+          - { lancedb: "0.33.0", legacy: false }
+          - { lancedb: "0.36.0", legacy: false }
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
 
     - name: Set up Python
+      if: matrix.legacy == false
       uses: actions/setup-python@v6
       with:
         python-version: '3.11'
 
     - name: Install dependencies
+      if: matrix.legacy == false
       run: |
         python -m pip install --upgrade pip
         pip install -c backend/constraints-${{ matrix.lancedb }}.txt \
@@ -160,6 +178,23 @@ jobs:
         pip install pytest httpx2
 
     - name: Run API endpoint tests
+      if: matrix.legacy == false
       run: |
         cd backend
         python -m pytest tests/ -v
+
+    - name: Build legacy test environment
+      if: matrix.legacy == true
+      run: |
+        docker build \
+          -f docker/Dockerfile.legacy-test \
+          --build-arg LANCEDB_VERSION=${{ matrix.lancedb }} \
+          -t legacy-tests:${{ matrix.lancedb }} \
+          .
+
+    - name: Run API endpoint tests in legacy environment
+      if: matrix.legacy == true
+      run: |
+        docker run --rm \
+          -v "${GITHUB_WORKSPACE}:/src:ro" \
+          legacy-tests:${{ matrix.lancedb }}

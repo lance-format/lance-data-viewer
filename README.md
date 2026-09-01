@@ -149,7 +149,9 @@ docker build -f docker/Dockerfile \
 # Build multiple versions for testing
 docker build -f docker/Dockerfile --build-arg LANCEDB_VERSION=0.24.3 -t lance-data-viewer:lancedb-0.24.3 .
 docker build -f docker/Dockerfile --build-arg LANCEDB_VERSION=0.16.0 -t lance-data-viewer:lancedb-0.16.0 .
-docker build -f docker/Dockerfile --build-arg LANCEDB_VERSION=0.3.4 -t lance-data-viewer:lancedb-0.3.4 .
+
+# Legacy packages are no longer on PyPI, so reuse their published dependency layer
+docker build -f docker/Dockerfile.legacy --build-arg LANCEDB_VERSION=0.3.4 -t lance-data-viewer:lancedb-0.3.4 .
 
 # Make your Lance data readable (one-time setup)
 chmod -R o+rx data
@@ -177,7 +179,9 @@ cd backend && python -m pytest tests/ -v
 ```
 
 Swap the constraints file to test against a different Lance version. CI runs
-the suite against every supported version.
+the suite against every supported version. LanceDB 0.3.1, 0.3.4, and 0.5 can
+only be tested through their published images because their packages are no
+longer available from PyPI.
 
 ### Development workflow
 

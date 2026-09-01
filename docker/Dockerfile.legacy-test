@@ -1,0 +1,14 @@
+ARG LEGACY_IMAGE=ghcr.io/lance-format/lance-data-viewer
+ARG LANCEDB_VERSION=0.3.4
+
+# Reuse only the unavailable legacy dependency set. The repository is mounted
+# at /src when this image runs, so pytest always exercises the checked-out code.
+FROM ${LEGACY_IMAGE}:lancedb-${LANCEDB_VERSION}
+
+USER root
+RUN python -m pip install --no-cache-dir pytest httpx2
+
+ENV PYTHONPATH=/home/appuser/.local/lib/python3.11/site-packages
+WORKDIR /src/backend
+ENTRYPOINT ["python", "-m", "pytest", "-o", "cache_dir=/tmp/pytest_cache", "tests/"]
+CMD ["-v"]
